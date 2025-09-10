@@ -4,6 +4,7 @@ setup(
     name='robotis_dds_python',
     version='0.1.0',
     author='Taehyeong Kim',
+    author_email='kth@robotis.com',
     maintainer='Pyo',
     maintainer_email='pyo@robotis.com',
     long_description=open('README.md').read(),
