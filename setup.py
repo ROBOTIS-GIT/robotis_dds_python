@@ -3,8 +3,9 @@ from setuptools import setup, find_packages
 setup(
     name='robotis_dds_python',
     version='0.1.0',
-    author='Robotis',
-    author_email='pyo@robotis.com',
+    author='Taehyeong Kim',
+    maintainer='Pyo',
+    maintainer_email='pyo@robotis.com',
     long_description=open('README.md').read(),
     long_description_content_type="text/markdown",
     license="Apache-2.0",
