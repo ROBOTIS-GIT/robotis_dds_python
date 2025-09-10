@@ -45,10 +45,17 @@ cmake --install .
 
 2. After installation, make sure to set the environment variables so that Python can locate the CycloneDDS libraries:
 ```bash
-export CYCLONEDDS_HOME=$HOME/cyclonedds/install
-export CMAKE_PREFIX_PATH=$CYCLONEDDS_HOME:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=$CYCLONEDDS_HOME/lib:$LD_LIBRARY_PATH
-export PATH=$CYCLONEDDS_HOME/bin:$PATH
+# For bash
+echo 'export CYCLONEDDS_HOME=$HOME/cyclonedds/install' >> ~/.bashrc
+echo 'export CMAKE_PREFIX_PATH=$CYCLONEDDS_HOME:$CMAKE_PREFIX_PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=$CYCLONEDDS_HOME/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+echo 'export PATH=$CYCLONEDDS_HOME/bin:$PATH' >> ~/.bashrc
+
+# For zsh
+echo 'export CYCLONEDDS_HOME=$HOME/cyclonedds/install' >> ~/.zshrc
+echo 'export CMAKE_PREFIX_PATH=$CYCLONEDDS_HOME:$CMAKE_PREFIX_PATH' >> ~/.zshrc
+echo 'export LD_LIBRARY_PATH=$CYCLONEDDS_HOME/lib:$LD_LIBRARY_PATH' >> ~/.zshrc
+echo 'export PATH=$CYCLONEDDS_HOME/bin:$PATH' >> ~/.zshrc
 ```
 
 Finally, install robotis_dds_python:
