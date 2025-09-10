@@ -1,10 +1,9 @@
 # robotis_dds_python
-
-A Python SDK for publishing and subscribing to topics using CycloneDDS without importing rclpy. This library provides a lightweight alternative to ROS 2 Python API while maintaining compatibility with ROS 2 message types.
-
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![CycloneDDS](https://img.shields.io/badge/CycloneDDS-0.10.x-green.svg)](https://github.com/eclipse-cyclonedds/cyclonedds)
+
+A Python SDK for publishing and subscribing to topics using CycloneDDS without importing rclpy. This library provides a lightweight alternative to ROS 2 Python API while maintaining compatibility with ROS 2 message types.
 
 ## Features
 
