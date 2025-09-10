@@ -51,11 +51,15 @@ echo 'export CMAKE_PREFIX_PATH=$CYCLONEDDS_HOME:$CMAKE_PREFIX_PATH' >> ~/.bashrc
 echo 'export LD_LIBRARY_PATH=$CYCLONEDDS_HOME/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
 echo 'export PATH=$CYCLONEDDS_HOME/bin:$PATH' >> ~/.bashrc
 
+source ~/.bashrc
+
 # For zsh
 echo 'export CYCLONEDDS_HOME=$HOME/cyclonedds/install' >> ~/.zshrc
 echo 'export CMAKE_PREFIX_PATH=$CYCLONEDDS_HOME:$CMAKE_PREFIX_PATH' >> ~/.zshrc
 echo 'export LD_LIBRARY_PATH=$CYCLONEDDS_HOME/lib:$LD_LIBRARY_PATH' >> ~/.zshrc
 echo 'export PATH=$CYCLONEDDS_HOME/bin:$PATH' >> ~/.zshrc
+
+source ~/.zshrc
 ```
 
 Finally, install robotis_dds_python:
