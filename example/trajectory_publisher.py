@@ -47,9 +47,12 @@ def create_trajectory(t: float) -> JointTrajectory_:
 
 t = 0.0
 
-while True:
-    t += 0.1
-    msg = create_trajectory(t)
-    writer.write(msg)
-    print(f"Published {len(msg.points)} points")
-    time.sleep(1.0)
+try:
+    while True:
+        t += 0.1
+        msg = create_trajectory(t)
+        writer.write(msg)
+        print(f"Published {len(msg.points)} points")
+        time.sleep(1.0)
+except KeyboardInterrupt:
+    print("\nPublisher stopped.")
