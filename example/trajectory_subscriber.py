@@ -20,11 +20,12 @@ qos = Qos(
 topic_manager = TopicManager()
 reader = topic_manager.topic_reader(topic_name='/joint_trajectory', topic_type=JointTrajectory_, qos=qos)
 
-while True:
-    try:
-        for sample in reader.take_iter():
-            print(sample)
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        pass
+try:
+    while True:
+        try:
+            for sample in reader.take_iter():
+                print(sample)
+        except Exception as e:
+            print(f"Error: {e}")
+except KeyboardInterrupt:
+    print("\nSubscriber stopped.")
