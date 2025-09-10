@@ -27,6 +27,11 @@ jobs:
         sudo apt install -y cmake build-essential cyclonedds-dev
         python -m pip install --upgrade pip
 
+    - name: Set environment variables for CycloneDDS
+      run: |
+        echo "CYCLONEDDS_HOME=/usr" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=/usr" >> $GITHUB_ENV
+
     - name: Install Python dependencies
       run: |
         pip install cyclonedds==0.10.2
