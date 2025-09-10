@@ -87,7 +87,7 @@ To add support for new ROS 2 message types:
 
 2. Generate Python bindings from IDL:
    ```bash
-   idlc -l py -I /opt/ros/jazzy/share/ /opt/ros/jazzy/share/your_package/msg/{YourMessage}.idl
+   idlc -l py -I /opt/ros/jazzy/share/ /opt/ros/jazzy/share/{your_package}/msg/{YourMessage}.idl
    ```
 
 3. Update the generated files and `__init__.py` as needed.
