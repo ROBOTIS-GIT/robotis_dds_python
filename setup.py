@@ -11,7 +11,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache-2.0",
     packages=find_packages(include=['robotis_dds_python', 'robotis_dds_python.*']),
-    description='Robotis python sdk',
+    description='Python SDK for DDS-based communication using Cyclone DDS',
     project_urls={
         "Source Code": "https://github.com/robotis-git/robotis_dds_python",
     },
