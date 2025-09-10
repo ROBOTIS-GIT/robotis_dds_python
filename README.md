@@ -57,12 +57,11 @@ To add support for new ROS 2 message types:
 
 ### topic_manager
 
-#### topic_writer(domain_id, topic_name, topic_type, qos)
+#### topic_writer(topic_name, topic_type, qos)
 
 Creates a DDS DataWriter for publishing messages.
 
 **Parameters:**
-- `domain_id` (int): DDS domain ID (default: $ROS_DOMAIN_ID)
 - `topic_name` (str): Name of the topic
 - `topic_type` (Type): Message type class
 - `qos` (Qos, optional): Quality of Service settings
@@ -74,7 +73,6 @@ Creates a DDS DataWriter for publishing messages.
 Creates a DDS DataReader for subscribing to messages.
 
 **Parameters:**
-- `domain_id` (int): DDS domain ID (default: $ROS_DOMAIN_ID)  
 - `topic_name` (str): Name of the topic
 - `topic_type` (Type): Message type class
 - `qos` (Qos, optional): Quality of Service settings
