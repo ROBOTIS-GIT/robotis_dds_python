@@ -17,7 +17,7 @@ A Python SDK for publishing and subscribing to topics using CycloneDDS without i
 ### Prerequisites
 
 - Python 3.8 or higher
-- CycloneDDS 0.10.x
+- CycloneDDS 0.10.2
 
 ### Install from source
 
@@ -31,6 +31,7 @@ sudo apt install -y git build-essential cmake libssl-dev
 # Clone CycloneDDS source
 git clone https://github.com/eclipse-cyclonedds/cyclonedds.git
 cd cyclonedds
+git checkout 0.10.2
 
 # Create a build directory
 mkdir build && cd build
