@@ -21,6 +21,37 @@ A Python SDK for publishing and subscribing to topics using CycloneDDS without i
 
 ### Install from source
 
+1. Before using this package, you need to have CycloneDDS installed on your system. You can build it from source as follows:
+
+```bash
+# Install build dependencies
+sudo apt update
+sudo apt install -y git build-essential cmake libssl-dev
+
+# Clone CycloneDDS source
+git clone https://github.com/eclipse-cyclonedds/cyclonedds.git
+cd cyclonedds
+
+# Create a build directory
+mkdir build && cd build
+
+# Build and install CycloneDDS
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/cyclonedds/install -DBUILD_EXAMPLES=ON ..
+cmake --build .
+cmake --install .
+```
+* Note: You can change $HOME/cyclonedds/install to any directory you prefer.
+
+2. After installation, make sure to set the environment variables so that Python can locate the CycloneDDS libraries:
+```bash
+export CYCLONEDDS_HOME=$HOME/cyclonedds/install
+export CMAKE_PREFIX_PATH=$CYCLONEDDS_HOME:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=$CYCLONEDDS_HOME/lib:$LD_LIBRARY_PATH
+export PATH=$CYCLONEDDS_HOME/bin:$PATH
+```
+
+Finally, install robotis_dds_python:
+
 ```bash
 # Clone the repository
 git clone https://github.com/robotis-git/robotis_dds_python.git
