@@ -24,9 +24,9 @@ A Python SDK for publishing and subscribing to topics using CycloneDDS without i
 ```bash
 # Clone the repository
 git clone https://github.com/robotis-git/robotis_dds_python.git
-cd robotis_dds_python
 
 # Install the package
+cd robotis_dds_python
 pip install -e .
 ```
 
@@ -55,7 +55,9 @@ To add support for new ROS 2 message types:
 
 ## API Reference
 
-### topic_writer(domain_id, topic_name, topic_type, qos=None)
+### topic_manager
+
+#### topic_writer(domain_id, topic_name, topic_type, qos)
 
 Creates a DDS DataWriter for publishing messages.
 
@@ -67,7 +69,7 @@ Creates a DDS DataWriter for publishing messages.
 
 **Returns:** DataWriter instance
 
-### topic_reader(domain_id, topic_name, topic_type, qos=None)
+#### topic_reader(domain_id, topic_name, topic_type, qos)
 
 Creates a DDS DataReader for subscribing to messages.
 
