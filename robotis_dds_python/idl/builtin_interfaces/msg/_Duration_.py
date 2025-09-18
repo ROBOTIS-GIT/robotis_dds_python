@@ -15,7 +15,7 @@ import cyclonedds.idl.annotations as annotate
 import cyclonedds.idl.types as types
 
 # root module import for resolving types
-import builtin_interfaces
+# import builtin_interfaces
 
 
 @dataclass
