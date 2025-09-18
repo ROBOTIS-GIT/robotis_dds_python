@@ -22,8 +22,10 @@ import math
 from cyclonedds.core import Qos, Policy
 from cyclonedds.util import duration
 
-from robotis_dds_python.idl.trajectory_msgs.msg import JointTrajectory_, JointTrajectoryPoint_
-from robotis_dds_python.idl.builtin_interfaces.msg import Time_, Duration_
+from robotis_dds_python.idl.trajectory_msgs.msg import JointTrajectory_
+from robotis_dds_python.idl.trajectory_msgs.msg import JointTrajectoryPoint_
+from robotis_dds_python.idl.builtin_interfaces.msg import Time_
+from robotis_dds_python.idl.builtin_interfaces.msg import Duration_
 from robotis_dds_python.idl.std_msgs.msg import Header_
 from robotis_dds_python.tools.topic_manager import TopicManager
 
