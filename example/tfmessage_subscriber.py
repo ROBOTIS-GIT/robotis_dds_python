@@ -48,7 +48,7 @@ reader = topic_manager.topic_reader(
 try:
     while True:
         for msg in reader.take_iter(timeout=duration(seconds=1)):
-            print(f"Published TFMessage ({len(msg.transforms)} frames)")
+            print(f"Received TFMessage ({len(msg.transforms)} frames)")
             for tf in msg.transforms:
                 print(f"  {tf.header.frame_id} → {tf.child_frame_id} "
                     f"({tf.transform.translation.x:.2f}, {tf.transform.translation.y:.2f})")
