@@ -17,5 +17,4 @@
 0.1.1 (2025-10-27)
 ------------------
 * Support for geometry_msgs and tf2_msgs
-* Example jointstate, transformstamped and tfmessage publisher and subscriber
 * Contributors: Heewon Lee
