@@ -31,5 +31,3 @@ class TransformStamped_(idl.IdlStruct, typename="geometry_msgs.msg.dds_.Transfor
     header: Header_
     child_frame_id: str
     transform: Transform_
-
-
