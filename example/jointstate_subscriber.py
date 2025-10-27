@@ -41,7 +41,7 @@ reader = topic_manager.topic_reader(topic_name="/joint_states", topic_type=Joint
 try:
     while True:
         try:
-            for sample in reader.take_iter():
+            for sample in reader.take_iter(timeout=duration(seconds=1)):
                 if sample:
                     print(f"[JointState Sub] {sample.name} → pos={sample.position}, vel={sample.velocity}, eff={sample.effort}")
         except Exception as e:
