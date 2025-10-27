@@ -19,12 +19,20 @@
 
 import time
 import math
+from cyclonedds.core import Qos, Policy
+from cyclonedds.util import duration
 
 from robotis_dds_python.idl.sensor_msgs.msg import JointState_
 from robotis_dds_python.idl.std_msgs.msg import Header_
 from robotis_dds_python.idl.builtin_interfaces.msg import Time_
 from robotis_dds_python.tools.topic_manager import TopicManager
 
+
+qos = Qos(
+    Policy.Reliability.Reliable(duration()),
+    Policy.Durability.Volatile,
+    Policy.History.KeepLast(1)
+)
 
 # Use the utility function to create the writer
 topic_manager = TopicManager()
