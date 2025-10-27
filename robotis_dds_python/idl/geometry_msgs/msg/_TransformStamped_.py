@@ -31,6 +31,6 @@ from robotis_dds_python.idl.geometry_msgs.msg import Transform_
 class TransformStamped_(idl.IdlStruct, typename="geometry_msgs.msg.dds_.TransformStamped_"):
     header: Header_
     child_frame_id: str
-    transform: 'Transform_'
+    transform: Transform_
 
 
