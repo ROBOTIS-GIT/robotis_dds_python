@@ -40,7 +40,8 @@ topic_manager = TopicManager()
 reader = topic_manager.topic_reader(
     topic_name="/tf",
     topic_type=TFMessage_,
-    qos=qos
+    qos=qos,
+    listener=listener
 )
 
 
