@@ -74,3 +74,4 @@ try:
         time.sleep(1.0)
 except KeyboardInterrupt:
     print("\nPublisher stopped.")
+    
