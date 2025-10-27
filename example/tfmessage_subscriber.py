@@ -53,3 +53,4 @@ try:
                     f"({tf.transform.translation.x:.2f}, {tf.transform.translation.y:.2f})")
 except KeyboardInterrupt:
     print("\nSubscriber stopped.")
+    

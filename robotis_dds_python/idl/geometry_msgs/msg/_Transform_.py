@@ -26,3 +26,4 @@ from robotis_dds_python.idl.geometry_msgs.msg import Vector3_, Quaternion_
 class Transform_(idl.IdlStruct, typename="geometry_msgs.msg.dds_.Transform_"):
     translation: Vector3_
     rotation: Quaternion_
+    
