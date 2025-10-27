@@ -36,7 +36,7 @@ qos = Qos(
 
 # Use the utility function to create the writer
 topic_manager = TopicManager()
-writer = topic_manager.topic_writer(topic_name='/joint_states', topic_type=JointState_ )
+writer = topic_manager.topic_writer(topic_name='/joint_states', topic_type=JointState_, qos=qos )
 
 
 def create_joint_state(t: float) -> JointState_:
