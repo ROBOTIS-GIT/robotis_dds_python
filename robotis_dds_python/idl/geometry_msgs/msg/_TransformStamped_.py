@@ -20,7 +20,6 @@ import cyclonedds.idl.types as types
 # if TYPE_CHECKING:
 #    import std_msgs.msg
 
-
 from robotis_dds_python.idl.std_msgs.msg import Header_
 from robotis_dds_python.idl.geometry_msgs.msg import Transform_
 

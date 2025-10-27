@@ -17,7 +17,6 @@ import cyclonedds.idl.types as types
 # root module import for resolving types
 # import geometry_msgs
 
-from robotis_dds_python.idl.std_msgs.msg import Header_
 
 @dataclass
 @annotate.final
