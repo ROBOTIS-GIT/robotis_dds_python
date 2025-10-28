@@ -5,7 +5,6 @@
 * Support for geometry_msgs and tf2_msgs
 * Contributors: Heewon Lee
 
-
 0.1.0 (2025-09-10)
 ------------------
 * Initial release of ROBOTIS Python SDK
