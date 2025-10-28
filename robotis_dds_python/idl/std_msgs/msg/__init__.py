@@ -6,4 +6,6 @@
 """
 
 from ._Header_ import Header_
-__all__ = ["Header_", ]
+from ._String_ import String_
+
+__all__ = ["Header_", "String_"]

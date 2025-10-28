@@ -1,0 +1,3 @@
+struct StringMsg {
+  string data;
+};

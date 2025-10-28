@@ -16,7 +16,18 @@
 #
 # Author: Taehyeong Kim
 
+"""String message type."""
 
-from . import builtin_interfaces, physical_ai_interfaces, std_msgs, trajectory_msgs
+from dataclasses import dataclass
 
-__all__ = ['builtin_interfaces', 'physical_ai_interfaces', 'std_msgs', 'trajectory_msgs']
+import cyclonedds.idl as idl
+import cyclonedds.idl.annotations as annotate
+
+
+@dataclass
+@annotate.final
+@annotate.autoid('sequential')
+class String_(idl.IdlStruct, typename='std_msgs::msg::dds_::String_'):
+    """String message."""
+
+    data: str = ''

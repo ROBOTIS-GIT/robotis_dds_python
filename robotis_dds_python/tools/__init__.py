@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: Taehyeong Kim
+# Author: Taehyeong Kim, Dongyun Kim
 
-
-from . import topic_manager
+from . import dds_node  # noqa: F401
