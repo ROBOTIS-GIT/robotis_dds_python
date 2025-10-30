@@ -4,22 +4,28 @@
   Module: geometry_msgs.msg
 """
 
-from ._Twist_ import Twist_
 from ._Vector3_ import Vector3_
+from ._Twist_ import Twist_
 from ._Quaternion_ import Quaternion_
 from ._Transform_ import Transform_
 from ._TransformStamped_ import TransformStamped_
 from ._Point_ import Point_
 from ._Pose_ import Pose_
 from ._PoseWithCovariance_ import PoseWithCovariance_
+from ._TwistStamped_ import TwistStamped_
+from ._TwistWithCovariance_ import TwistWithCovariance_
+from ._TwistWithCovarianceStamped_ import TwistWithCovarianceStamped_
 
 __all__ = [
-    "Twist_",
     "Vector3_",
+    "Twist_",
     "Quaternion_",
     "Transform_",
     "TransformStamped_",
     "Point_",
     "Pose_",
     "PoseWithCovariance_",
+    "TwistStamped_",
+    "TwistWithCovariance_",
+    "TwistWithCovarianceStamped_",
 ]

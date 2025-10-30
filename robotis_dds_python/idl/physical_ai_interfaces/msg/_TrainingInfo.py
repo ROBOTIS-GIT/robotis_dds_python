@@ -13,10 +13,6 @@ import cyclonedds.idl.annotations as annotate
 class TrainingInfo(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TrainingInfo_'):
     """TrainingInfo message."""
 
-    dataset: str = ''
-    policy_type: str = ''
-    output_folder_name: str = ''
-    policy_device: str = ''
     seed: int
     num_workers: int
     batch_size: int
@@ -24,3 +20,7 @@ class TrainingInfo(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::T
     eval_freq: int
     log_freq: int
     save_freq: int
+    dataset: str = ''
+    policy_type: str = ''
+    output_folder_name: str = ''
+    policy_device: str = ''

@@ -13,8 +13,8 @@ import cyclonedds.idl.annotations as annotate
 class DatasetInfo(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::DatasetInfo_'):
     """DatasetInfo message."""
 
-    codebase_version: str = ''
-    robot_type: str = ''
     total_episodes: int
     total_tasks: int
     fps: int
+    codebase_version: str = ''
+    robot_type: str = ''

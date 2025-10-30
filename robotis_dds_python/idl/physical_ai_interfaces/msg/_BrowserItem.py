@@ -13,9 +13,10 @@ import cyclonedds.idl.annotations as annotate
 class BrowserItem(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::BrowserItem_'):
     """BrowserItem message."""
 
+    size: int
     name: str = ''
     full_path: str = ''
     is_directory: bool = False
-    size: int
     modified_time: str = ''
     has_target_file: bool = False
+    

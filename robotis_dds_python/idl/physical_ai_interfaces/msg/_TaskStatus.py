@@ -26,17 +26,17 @@ class TaskStatus(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::Tas
     INFERENCING = 6
 
     task_info: TaskInfo
-    robot_type: str = ''
     phase: int
     total_time: int
     proceed_time: int
     current_episode_number: int
     current_scenario_number: int
-    current_task_instruction: str = ''
     encoding_progress: float
     used_storage_size: float
     total_storage_size: float
     used_cpu: float
     used_ram_size: float
     total_ram_size: float
+    robot_type: str = ''
+    current_task_instruction: str = ''
     error: str = ''

@@ -13,11 +13,11 @@ import cyclonedds.idl.annotations as annotate
 class HFOperationStatus(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::HFOperationStatus_'):
     """HFOperationStatus message."""
 
+    progress_current: int
+    progress_total: int
+    progress_percentage: float
     operation: str = ''
     status: str = ''
     local_path: str = ''
     repo_id: str = ''
     message: str = ''
-    progress_current: int
-    progress_total: int
-    progress_percentage: float
