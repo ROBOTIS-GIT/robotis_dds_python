@@ -12,17 +12,19 @@ from dataclasses import dataclass
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate
-import cyclonedds.idl.types as types
 
 # root module import for resolving types
-import geometry_msgs
+# import geometry_msgs
+
+from robotis_dds_python.idl.geometry_msgs.msg import Vector3_
+from robotis_dds_python.idl.geometry_msgs.msg import Quaternion_
 
 
 @dataclass
 @annotate.final
 @annotate.autoid("sequential")
-class Transform(idl.IdlStruct, typename="geometry_msgs.msg.Transform"):
-    translation: 'geometry_msgs.msg.Vector3'
-    rotation: 'geometry_msgs.msg.Quaternion'
+class Transform_(idl.IdlStruct, typename="geometry_msgs.msg.dds_.Transform_"):
+    translation: Vector3_
+    rotation: Quaternion_
 
 

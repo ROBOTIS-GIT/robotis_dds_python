@@ -15,13 +15,13 @@ import cyclonedds.idl.annotations as annotate
 import cyclonedds.idl.types as types
 
 # root module import for resolving types
-import geometry_msgs
+# import geometry_msgs
 
 
 @dataclass
 @annotate.final
 @annotate.autoid("sequential")
-class Vector3(idl.IdlStruct, typename="geometry_msgs.msg.Vector3"):
+class Vector3_(idl.IdlStruct, typename="geometry_msgs.msg.dds_.Vector3_"):
     x: types.float64
     y: types.float64
     z: types.float64
