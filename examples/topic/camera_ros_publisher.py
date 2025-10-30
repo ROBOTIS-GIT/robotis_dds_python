@@ -3,9 +3,7 @@
 ROS2 → DDS: Receive sensor_msgs/CompressedImage and display
 
 python3 camera_ros_publisher.py
-ros2 topic echo /camera/image/compressed sensor_msgs/msg/CompressedImage
-rqt_image_view /camera/image/compressed
-
+python3 camera_subscriber.py
 """
 
 
@@ -26,7 +24,7 @@ class CameraPublisher(Node):
 
         self.get_logger().info("📸 ROS2 CompressedImage Publisher started")
 
-        self.timer = self.create_timer(0.2, self.publish_frame)
+        self.timer = self.create_timer(0.1, self.publish_frame)
 
     def publish_frame(self):
         ret, frame = self.cap.read()

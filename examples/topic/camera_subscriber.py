@@ -3,6 +3,7 @@
 ROS2 → DDS: Receive sensor_msgs/CompressedImage and display
 
 ros2 run image_publisher image_publisher_node
+python3 camera_ros_publisher.py
 python3 camera_subscriber.py
 """
 
