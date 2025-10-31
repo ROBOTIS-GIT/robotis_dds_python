@@ -5,7 +5,6 @@ DDS → ROS2: Publish camera frames as sensor_msgs/CompressedImage
 python3 image_publisher.py
 ros2 topic echo /camera/image/compressed sensor_msgs/msg/CompressedImage
 rqt_image_view /camera/image/compressed
-
 """
 
 import cv2
