@@ -22,13 +22,13 @@ import time
 from cyclonedds.core import Policy, Qos
 from cyclonedds.util import duration
 
-from robotis_dds_python.idl.builtin_interfaces.msg import Duration_, Time_
-from robotis_dds_python.idl.std_msgs.msg import Header_
-from robotis_dds_python.idl.trajectory_msgs.msg import (
+from robotis_dds_python.robotis_dds_core.idl.builtin_interfaces.msg import Duration_, Time_
+from robotis_dds_python.robotis_dds_core.idl.std_msgs.msg import Header_
+from robotis_dds_python.robotis_dds_core.idl.trajectory_msgs.msg import (
     JointTrajectory_,
     JointTrajectoryPoint_,
 )
-from robotis_dds_python.tools.dds_node import DDSNode
+from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 
 
 qos = Qos(

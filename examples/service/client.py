@@ -17,11 +17,11 @@ Examples:
 import sys
 import time
 
-from robotis_dds_python.idl.physical_ai_interfaces.srv import (
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.srv import (
     SetRobotType_Request,
     SetRobotType_Response,
 )
-from robotis_dds_python.tools.dds_node import DDSNode
+from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 
 
 def main():

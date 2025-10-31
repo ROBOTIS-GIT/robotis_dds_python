@@ -24,8 +24,8 @@ and subscribe to topics published by ROS 2.
 
 import time
 
-from robotis_dds_python.idl.std_msgs.msg import String_
-from robotis_dds_python.tools.dds_node import DDSNode
+from robotis_dds_python.robotis_dds_core.idl.std_msgs.msg import String_
+from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 
 
 def main():

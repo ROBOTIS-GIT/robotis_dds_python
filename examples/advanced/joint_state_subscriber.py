@@ -14,48 +14,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: Taehyeong Kim, Dongyun Kim
-
+# Author: Taehyeong Kim, Dongyun Kim, Heewon Lee
 
 from cyclonedds.core import Policy, Qos
 from cyclonedds.util import duration
 
-from robotis_dds_python.robotis_dds_core.idl.trajectory_msgs.msg import JointTrajectory_
+from robotis_dds_python.robotis_dds_core.idl.sensor_msgs.msg import JointState_
 from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 
 
-def trajectory_callback(msg):
-    """Process incoming trajectory messages."""
-    print(f'Received trajectory with {len(msg.points)} points')
-    print(f'Joint names: {msg.joint_names}')
-    if msg.points:
-        print(f'First point positions: {msg.points[0].positions}')
-    else:
-        print('First point positions: No points')
-    print('---')
+def joint_state_callback(msg: JointState_):
+    """Process incoming JointState messages."""
+    print(f"[{msg.header.frame_id}]")
+    print(f"  Names: {msg.name}")
+    print(f"  Positions: {msg.position}")
+    print(f"  Velocities: {msg.velocity}")
+    print(f"  Efforts: {msg.effort}")
+    print("---")
 
 
+# QoS 설정 (Reliable + KeepLast 10)
 qos = Qos(
     Policy.Reliability.Reliable(duration()),
     Policy.Durability.Volatile,
     Policy.History.KeepLast(10)
 )
 
-# Create DDSNode (ROS 2 Node style)
-node = DDSNode(name='trajectory_subscriber_node')
+# DDS 노드 생성
+node = DDSNode(name="joint_state_subscriber_node")
 
-# Create subscription with callback
+# 구독자 생성
 reader = node.dds_create_subscription(
-    topic_name='/joint_trajectory',
-    topic_type=JointTrajectory_,
-    callback=trajectory_callback,
+    topic_name="/joint_states",
+    topic_type=JointState_,
+    callback=joint_state_callback,
     qos=qos
 )
 
-print(f'[{node.name}] Subscription created. Spinning...')
+print(f"[{node.name}] Subscription created. Listening to /joint_states ...")
 
-# Spin to keep callbacks active (like rclpy.spin)
-node.dds_spin()
+try:
+    node.dds_spin()
+except KeyboardInterrupt:
+    print(f"\n[{node.name}] Shutting down...")
 
-# Cleanup
 node.dds_destroy_node()
+print(f"[{node.name}] Node destroyed.")

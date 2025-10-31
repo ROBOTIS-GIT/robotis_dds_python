@@ -21,12 +21,12 @@
 from cyclonedds.core import Policy, Qos
 from cyclonedds.util import duration
 
-from robotis_dds_python.idl.sensor_msgs.msg import (
+from robotis_dds_python.robotis_dds_core.idl.sensor_msgs.msg import (
     CompressedImage_,
     JointState_,
 )
-from robotis_dds_python.idl.trajectory_msgs.msg import JointTrajectory_
-from robotis_dds_python.tools.dds_node import DDSNode
+from robotis_dds_python.robotis_dds_core.idl.trajectory_msgs.msg import JointTrajectory_
+from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 
 
 def trajectory_callback(msg):

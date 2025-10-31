@@ -12,8 +12,8 @@ Test with ROS 2:
     ros2 topic pub /ros2_test std_msgs/msg/String "data: 'Hello from ROS 2'"
 """
 
-from robotis_dds_python.idl.std_msgs.msg import String_
-from robotis_dds_python.tools.dds_node import DDSNode
+from robotis_dds_python.robotis_dds_core.idl.std_msgs.msg import String_
+from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 
 
 def main():
