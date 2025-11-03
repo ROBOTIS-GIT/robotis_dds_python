@@ -22,7 +22,7 @@ from robotis_dds_python.robotis_dds_core.idl.sensor_msgs.msg import (
     BatteryState_,
 )
 from robotis_dds_python.robotis_dds_core.idl.nav_msgs.msg import Odometry_
-from robotis_dds_python.robotis_dds_core.idl.geometry_msgs.msg import Twist_
+from robotis_dds_python.robotis_dds_core.idl.geometry_msgs.msg import (Twist_, Vector3_)
 from robotis_dds_python.robotis_dds_core.idl.trajectory_msgs.msg import (
     JointTrajectory_,
     JointTrajectoryPoint_,
@@ -143,9 +143,10 @@ class RobotisDDSSDK:
     # ----------------------------------------------------------------------
     def send_cmd_vel(self, linear_x: float, angular_z: float):
         """Publish a Twist message to /cmd_vel."""
-        msg = Twist_()
-        msg.linear.x = linear_x
-        msg.angular.z = angular_z
+        msg = Twist_(
+            linear=Vector3_(x=linear_x, y=0.0, z=0.0),
+            angular=Vector3_(x=0.0, y=0.0, z=angular_z),
+        )
         self.cmd_vel_pub.publish(msg)
 
     def send_joint_trajectory(self, positions: list[float]):
