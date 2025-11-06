@@ -8,4 +8,6 @@
 from ._CompressedImage_ import CompressedImage_
 from ._JointState_ import JointState_
 from ._BatteryState_ import BatteryState_
-__all__ = ["CompressedImage_", "JointState_", "BatteryState_"]
+from ._Image_ import Image_
+
+__all__ = ["CompressedImage_", "JointState_", "BatteryState_", "Image_"]

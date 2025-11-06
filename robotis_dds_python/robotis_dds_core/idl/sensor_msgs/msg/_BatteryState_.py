@@ -15,7 +15,7 @@ import cyclonedds.idl.annotations as annotate
 import cyclonedds.idl.types as types
 
 # root module import for resolving types
-import sensor_msgs
+# import sensor_msgs
 
 #if TYPE_CHECKING:
 #    import std_msgs.msg
