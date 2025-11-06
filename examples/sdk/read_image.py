@@ -1,23 +1,37 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-DDS Example - Read compressed camera image
+DDS ← ROS2: Subscribe to /camera/image (sensor_msgs/Image)
+and print received numpy arrays directly.
 """
+
+import time
 from robotis_dds_python.robotis_dds_sdk import RobotisDDSSDK
-import cv2
+import numpy as np
 
 def main():
-    rds = RobotisDDSSDK(domain_id=30)
-    print("📷 Reading DDS camera image stream... (press 'q' to quit)")
+    print("🧩 Robotis DDS SDK — Image Numpy Debug")
+    sdk = RobotisDDSSDK(domain_id=30)
 
-    while True:
-        frame = rds.get_rgb_image()
-        if frame is not None:
-            cv2.imshow("DDS Camera", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    try:
+        while True:
+            frame = sdk.get_image()
 
-    rds.close()
-    cv2.destroyAllWindows()
+            if isinstance(frame, np.ndarray):
+                print("\n📦 Received numpy frame:")
+                print(frame)
+                print("-" * 60)
+                time.sleep(1.0)  # 1 second delay to avoid too fast printing
+            else:
+                print("⏳ Waiting for /camera/image ...", end="\r")
+                time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        print("\n🧩 Interrupted by user.")
+    finally:
+        sdk.close()
+        print("✅ DDS closed.")
+
 
 if __name__ == "__main__":
     main()

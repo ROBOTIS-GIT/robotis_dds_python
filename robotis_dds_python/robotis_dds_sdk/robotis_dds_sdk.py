@@ -18,6 +18,7 @@ from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 # Message imports
 from robotis_dds_python.robotis_dds_core.idl.sensor_msgs.msg import (
     CompressedImage_,
+    Image_,
     JointState_,
     BatteryState_,
 )
@@ -36,11 +37,6 @@ class RobotisDDSSDK:
     Robotis DDS Python SDK
     ----------------------
     High-level wrapper around CycloneDDS for ROS2-compatible robot data exchange.
-
-    Provides simple APIs:
-        - get_*() : read cached sensor data
-        - set_*() : update cached control value
-        - send_*() : publish DDS messages (SDK handles message structure)
     """
 
     def __init__(self, domain_id=30):
@@ -58,7 +54,8 @@ class RobotisDDSSDK:
 
         # Topic mapping (topic_name → (msg_type, callback))
         self.topic_map = {
-            "/camera/image/compressed": (CompressedImage_, self._image_callback),
+            "/camera/image": (Image_, self._image_callback),               # Image (numpy conversion)
+            "/camera/image/compressed": (CompressedImage_, self._compressed_image_callback),  # Compressed Image (as is)
             "/odom": (Odometry_, self._odom_callback),
             "/joint_states": (JointState_, self._joint_state_callback),
             "/battery_state": (BatteryState_, self._battery_callback),
@@ -90,13 +87,42 @@ class RobotisDDSSDK:
     # ----------------------------------------------------------------------
     # DDS Callbacks (update internal cache)
     # ----------------------------------------------------------------------
-    def _image_callback(self, msg: CompressedImage_):
+    def _compressed_image_callback(self, msg: CompressedImage_):
+        """Handle /camera/image/compressed (sensor_msgs/CompressedImage) → numpy array"""
         try:
+            # ① Extract JPEG data from DDS message
             data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
-            img = np.frombuffer(data_bytes, dtype=np.uint8)
-            frame = cv2.imdecode(img, cv2.IMREAD_COLOR)
+
+            # ② Convert to numpy array
+            img_np = np.frombuffer(data_bytes, dtype=np.uint8)
+
+            # ③ Decode JPEG with OpenCV → Restore BGR image
+            frame = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+
+            # ④ Store in cache if successful
             if frame is not None:
                 self.cache["/camera/image/compressed"] = frame
+        except Exception as e:
+            print(f"[RobotisDDSSDK] ⚠ Compressed image decode error: {e}")
+
+
+    def _image_callback(self, msg: Image_):
+        """Handle /camera/image — numpy conversion"""
+        try:
+            img_data = bytes(msg.data) if isinstance(msg.data, list) else msg.data
+            frame = np.frombuffer(img_data, dtype=np.uint8)
+
+            if msg.encoding == "mono8":
+                frame = frame.reshape((msg.height, msg.width))
+            elif msg.encoding in ["bgr8", "rgb8"]:
+                frame = frame.reshape((msg.height, msg.width, 3))
+                if msg.encoding == "rgb8":
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            else:
+                print(f"[RobotisDDSSDK] ⚠ Unsupported encoding: {msg.encoding}")
+                return
+
+            self.cache["/camera/image"] = frame
         except Exception as e:
             print(f"[RobotisDDSSDK] ⚠ Image decode error: {e}")
 
@@ -126,7 +152,12 @@ class RobotisDDSSDK:
         self._ensure_subscription(topic_name)
         return self.cache.get(topic_name)
 
+    def get_image(self):
+        """Return latest Image (numpy converted /camera/image)"""
+        return self.get("/camera/image")
+
     def get_rgb_image(self):
+        """Return latest compressed image (/camera/image/compressed)"""
         return self.get("/camera/image/compressed")
 
     def get_odometry(self):
