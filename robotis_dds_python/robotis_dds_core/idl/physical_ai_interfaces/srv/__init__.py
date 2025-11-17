@@ -34,6 +34,8 @@ from ._SendTrainingCommand_Request import SendTrainingCommand_Request
 from ._SendTrainingCommand_Response import SendTrainingCommand_Response
 from ._SetHFUser_Request import SetHFUser_Request
 from ._SetHFUser_Response import SetHFUser_Response
+from ._Inference_Request import Inference_Request
+from ._Inference_Response import Inference_Response
 
 __all__ = [
     'SetRobotType_Request',
@@ -70,4 +72,6 @@ __all__ = [
     'SendTrainingCommand_Response',
     'SetHFUser_Request',
     'SetHFUser_Response',
+    'Inference_Request',
+    'Inference_Response',
 ]
