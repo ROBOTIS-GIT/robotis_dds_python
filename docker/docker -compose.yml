@@ -1,6 +1,6 @@
 services:
-  Isaac_gr00t:
-    container_name: isaac_gr00t
+  robotis_dds_pythons:
+    container_name: robotis_dds_python
     build:
       context: .
       dockerfile: Dockerfile
@@ -24,6 +24,6 @@ services:
       - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth:rw
-      - ../:/root/Isaac-GR00T
+      - ../../../physical_ai_tools:/root/physical_ai_tools
     privileged: true
     command: bash

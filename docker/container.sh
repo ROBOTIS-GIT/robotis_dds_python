@@ -2,7 +2,7 @@
 
 # Directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-CONTAINER_NAME="isaac_gr00t"
+CONTAINER_NAME="robotis_dds_python"
 COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.yml"
 
 # ---------------------- Helper ----------------------
