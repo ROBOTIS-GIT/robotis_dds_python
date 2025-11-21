@@ -36,6 +36,10 @@ from ._SetHFUser_Request import SetHFUser_Request
 from ._SetHFUser_Response import SetHFUser_Response
 from ._Inference_Request import Inference_Request
 from ._Inference_Response import Inference_Response
+from ._Kill_Request import Kill_Request
+from ._Kill_Response import Kill_Response
+from ._Ping_Request import Ping_Request
+from ._Ping_Response import Ping_Response
 
 __all__ = [
     'SetRobotType_Request',
@@ -74,4 +78,8 @@ __all__ = [
     'SetHFUser_Response',
     'Inference_Request',
     'Inference_Response',
+    'Kill_Request',
+    'Kill_Response',
+    'Ping_Request',
+    'Ping_Response',
 ]
