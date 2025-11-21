@@ -31,9 +31,13 @@ from robotis_dds_python.robotis_dds_core.idl.trajectory_msgs.msg import (
 from robotis_dds_python.robotis_dds_core.idl.std_msgs.msg import Header_
 from robotis_dds_python.robotis_dds_core.idl.builtin_interfaces.msg import Time_
 
+# -----------------------------
+# Add service request/response
+# -----------------------------
 from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.srv import (
-    Inference_Request,
-    Inference_Response,
+    Ping_Request, Ping_Response,
+    Kill_Request, Kill_Response,
+    Inference_Request, Inference_Response,
 )
 
 
@@ -42,7 +46,7 @@ class RobotisDDSSDK:
     Robotis DDS Python SDK
     ----------------------
     High-level wrapper around CycloneDDS for ROS2-compatible robot data exchange.
-    + Inference service integration
+    + Inference & System control service integration
     """
 
     def __init__(self, domain_id=30):
@@ -57,6 +61,9 @@ class RobotisDDSSDK:
         self._subscribed = {}
         self._last_inference_result = None
 
+        # -------------------------
+        # Sensor topics
+        # -------------------------
         self.topic_map = {
             "/camera/image": (Image_, self._image_callback),
             "/camera/image/compressed": (CompressedImage_, self._compressed_image_callback),
@@ -65,11 +72,58 @@ class RobotisDDSSDK:
             "/battery_state": (BatteryState_, self._battery_callback),
         }
 
+        # -------------------------
+        # Publishers
+        # -------------------------
         self.cmd_vel_pub = self.node.dds_create_publisher("/cmd_vel", Twist_)
         self.joint_traj_pub = self.node.dds_create_publisher("/joint_trajectory", JointTrajectory_)
 
+        # -------------------------
+        # Service Clients
+        # -------------------------
+        self.ping_client = self.node.dds_create_client(
+            "/inference/ping", Ping_Request, Ping_Response
+        )
+        self.kill_client = self.node.dds_create_client(
+            "/inference/kill", Kill_Request, Kill_Response
+        )
+
+        # (추후 inference API 넣을 때 여기에 추가)
+        # self.inference_client = ...
+
+        # DDS Spin Thread
         self.spin_thread = threading.Thread(target=self.node.dds_spin, daemon=True)
         self.spin_thread.start()
+
+        print("[RobotisDDSSDK] Initialized with Ping/Kill service support")
+
+    # ============================================================
+    #  Service Client API
+    # ============================================================
+
+    def ping(self):
+        """Ping the inference server."""
+        req = Ping_Request()
+        try:
+            resp: Ping_Response = self.ping_client.call(req)
+            return resp
+        except Exception as e:
+            print(f"[RobotisDDSSDK] Ping failed: {e}")
+            return Ping_Response(success=False, message=str(e))
+
+    def kill(self):
+        """Kill/stop the inference server."""
+        req = Kill_Request()
+        try:
+            resp: Kill_Response = self.kill_client.call(req)
+            return resp
+        except Exception as e:
+            print(f"[RobotisDDSSDK] Kill failed: {e}")
+            return Kill_Response(success=False, message=str(e))
+
+    # ============================================================
+    #  Subscription handling
+    # ============================================================
 
     def _ensure_subscription(self, topic_name: str):
         if topic_name in self._subscribed:
@@ -81,6 +135,10 @@ class RobotisDDSSDK:
         self.node.dds_create_subscription(topic_name, msg_type, cb)
         self._subscribed[topic_name] = True
         print(f"[RobotisDDSSDK] Subscribed to {topic_name}")
+
+    # ============================================================
+    #  Callbacks
+    # ============================================================
 
     def _compressed_image_callback(self, msg: CompressedImage_):
         try:
@@ -127,6 +185,10 @@ class RobotisDDSSDK:
             "percentage": msg.percentage,
         }
 
+    # ============================================================
+    #  Getter API
+    # ============================================================
+
     def get(self, topic_name: str):
         self._ensure_subscription(topic_name)
         return self.cache.get(topic_name)
@@ -136,6 +198,10 @@ class RobotisDDSSDK:
     def get_odometry(self): return self.get("/odom")
     def get_joint_state(self): return self.get("/joint_states")
     def get_battery_state(self): return self.get("/battery_state")
+
+    # ============================================================
+    #  Publishing API
+    # ============================================================
 
     def send_cmd_vel(self, linear_x: float, angular_z: float):
         msg = Twist_(
@@ -149,6 +215,7 @@ class RobotisDDSSDK:
         sec = int(now)
         nsec = int((now - sec) * 1e9)
         header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="base_link")
+
         point = JointTrajectoryPoint_(
             positions=positions,
             velocities=[],
@@ -156,6 +223,7 @@ class RobotisDDSSDK:
             effort=[],
             time_from_start=Time_(sec=1, nanosec=0),
         )
+
         msg = JointTrajectory_(
             header=header,
             joint_names=[f"joint_{i+1}" for i in range(len(positions))],
