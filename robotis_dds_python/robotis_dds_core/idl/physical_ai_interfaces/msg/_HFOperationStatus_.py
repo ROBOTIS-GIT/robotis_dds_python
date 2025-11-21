@@ -10,7 +10,7 @@ import cyclonedds.idl.annotations as annotate
 @dataclass
 @annotate.final
 @annotate.autoid('sequential')
-class HFOperationStatus(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::HFOperationStatus_'):
+class HFOperationStatus_(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::HFOperationStatus_'):
     """HFOperationStatus message."""
 
     progress_current: int

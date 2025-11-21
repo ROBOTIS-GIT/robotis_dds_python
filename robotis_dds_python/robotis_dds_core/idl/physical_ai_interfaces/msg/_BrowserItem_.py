@@ -10,7 +10,7 @@ import cyclonedds.idl.annotations as annotate
 @dataclass
 @annotate.final
 @annotate.autoid('sequential')
-class BrowserItem(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::BrowserItem_'):
+class BrowserItem_(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::BrowserItem_'):
     """BrowserItem message."""
 
     size: int

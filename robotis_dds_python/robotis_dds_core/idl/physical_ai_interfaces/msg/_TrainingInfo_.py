@@ -10,7 +10,7 @@ import cyclonedds.idl.annotations as annotate
 @dataclass
 @annotate.final
 @annotate.autoid('sequential')
-class TrainingInfo(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TrainingInfo_'):
+class TrainingInfo_(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TrainingInfo_'):
     """TrainingInfo message."""
 
     seed: int

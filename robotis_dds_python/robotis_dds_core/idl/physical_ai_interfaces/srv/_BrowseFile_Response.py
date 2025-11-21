@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate
-from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import BrowserItem
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg._BrowserItem_ import BrowserItem_
 
 
 @dataclass
@@ -19,4 +19,4 @@ class BrowseFile_Response(idl.IdlStruct, typename='physical_ai_interfaces::srv::
     current_path: str = ''
     parent_path: str = ''
     selected_path: str = ''
-    items: list[BrowserItem] = field(default_factory=list)
+    items: list[BrowserItem_] = field(default_factory=list)

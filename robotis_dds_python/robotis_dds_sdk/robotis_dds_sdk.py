@@ -40,6 +40,13 @@ from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.srv import (
     Inference_Request, Inference_Response,
 )
 
+# -----------------------------
+# ⭐ 추가: InferenceAction 메시지
+# -----------------------------
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import (
+    InferenceAction_,
+)
+
 
 class RobotisDDSSDK:
     """
@@ -72,11 +79,31 @@ class RobotisDDSSDK:
             "/battery_state": (BatteryState_, self._battery_callback),
         }
 
+        # ⭐ 추가: rosbag에서 쓰는 카메라 토픽들 통합
+        self.topic_map.update({
+            "/camera_left/camera_left/color/image_rect_raw/compressed":
+                (CompressedImage_, self._compressed_image_callback_left),
+
+            "/camera_right/camera_right/color/image_rect_raw/compressed":
+                (CompressedImage_, self._compressed_image_callback_right),
+
+            "/zed/zed_node/left/image_rect_color/compressed":
+                (CompressedImage_, self._compressed_image_callback_zed_left),
+
+            "/zed/zed_node/right/image_rect_color/compressed":
+                (CompressedImage_, self._compressed_image_callback_zed_right),
+        })
+
         # -------------------------
         # Publishers
         # -------------------------
         self.cmd_vel_pub = self.node.dds_create_publisher("/cmd_vel", Twist_)
         self.joint_traj_pub = self.node.dds_create_publisher("/joint_trajectory", JointTrajectory_)
+
+        # ⭐ 추가: InferenceAction Publisher
+        self.inference_action_pub = self.node.dds_create_publisher(
+            "/inference/action", InferenceAction_
+        )
 
         # -------------------------
         # Service Clients
@@ -150,6 +177,48 @@ class RobotisDDSSDK:
         except Exception as e:
             print(f"[RobotisDDSSDK] Compressed image decode error: {e}")
 
+    # ⭐ 추가: left/right/zed 카메라 콜백들
+
+    def _compressed_image_callback_left(self, msg: CompressedImage_):
+        try:
+            data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
+            img_np = np.frombuffer(data_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+            if frame is not None:
+                self.cache["/camera_left/camera_left/color/image_rect_raw/compressed"] = frame
+        except Exception as e:
+            print(f"[RobotisDDSSDK] Compressed image LEFT decode error: {e}")
+
+    def _compressed_image_callback_right(self, msg: CompressedImage_):
+        try:
+            data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
+            img_np = np.frombuffer(data_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+            if frame is not None:
+                self.cache["/camera_right/camera_right/color/image_rect_raw/compressed"] = frame
+        except Exception as e:
+            print(f"[RobotisDDSSDK] Compressed image RIGHT decode error: {e}")
+
+    def _compressed_image_callback_zed_left(self, msg: CompressedImage_):
+        try:
+            data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
+            img_np = np.frombuffer(data_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+            if frame is not None:
+                self.cache["/zed/zed_node/left/image_rect_color/compressed"] = frame
+        except Exception as e:
+            print(f"[RobotisDDSSDK] ZED LEFT decode error: {e}")
+
+    def _compressed_image_callback_zed_right(self, msg: CompressedImage_):
+        try:
+            data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
+            img_np = np.frombuffer(data_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+            if frame is not None:
+                self.cache["/zed/zed_node/right/image_rect_color/compressed"] = frame
+        except Exception as e:
+            print(f"[RobotisDDSSDK] ZED RIGHT decode error: {e}")
+
     def _image_callback(self, msg: Image_):
         try:
             img_data = bytes(msg.data) if isinstance(msg.data, list) else msg.data
@@ -199,6 +268,19 @@ class RobotisDDSSDK:
     def get_joint_state(self): return self.get("/joint_states")
     def get_battery_state(self): return self.get("/battery_state")
 
+    # ⭐ 추가: 편의용 getter들 (필요하면 사용)
+    def get_left_image(self):
+        return self.get("/camera_left/camera_left/color/image_rect_raw/compressed")
+
+    def get_right_image(self):
+        return self.get("/camera_right/camera_right/color/image_rect_raw/compressed")
+
+    def get_zed_left_image(self):
+        return self.get("/zed/zed_node/left/image_rect_color/compressed")
+
+    def get_zed_right_image(self):
+        return self.get("/zed/zed_node/right/image_rect_color/compressed")
+
     # ============================================================
     #  Publishing API
     # ============================================================
@@ -230,3 +312,21 @@ class RobotisDDSSDK:
             points=[point],
         )
         self.joint_traj_pub.publish(msg)
+
+    # ============================================================
+    #  ⭐ 추가: InferenceAction Publish API
+    # ============================================================
+
+    def publish_inference_action(self, **fields):
+        """
+        Publish an InferenceAction_ topic message.
+
+        예)
+            rds.publish_inference_action(
+                success=True,
+                message="ok",
+                payload=b"..."
+            )
+        """
+        msg = InferenceAction_(**fields)
+        self.inference_action_pub.publish(msg)

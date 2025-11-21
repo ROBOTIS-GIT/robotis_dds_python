@@ -5,13 +5,14 @@ from dataclasses import dataclass
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate
-from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import TaskInfo
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg._TaskInfo_ import TaskInfo_
+
 
 
 @dataclass
 @annotate.final
 @annotate.autoid('sequential')
-class TaskStatus(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TaskStatus_'):
+class TaskStatus_(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TaskStatus_'):
     """TaskStatus message."""
 
     ########################################
@@ -25,7 +26,7 @@ class TaskStatus(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::Tas
     STOPPED = 5
     INFERENCING = 6
 
-    task_info: TaskInfo
+    task_info: TaskInfo_
     phase: int
     total_time: int
     proceed_time: int

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate
-from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import TaskInfo as TaskInfo
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg._TaskInfo_ import TaskInfo_
 
 
 @dataclass
@@ -27,4 +27,4 @@ class SendCommand_Request(idl.IdlStruct, typename='physical_ai_interfaces::srv::
     SKIP_TASK = 7
 
     command: int
-    task_info: TaskInfo
+    task_info: TaskInfo_

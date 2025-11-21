@@ -10,7 +10,7 @@ import cyclonedds.idl.annotations as annotate
 @dataclass
 @annotate.final
 @annotate.autoid('sequential')
-class TaskInfo(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TaskInfo_'):
+class TaskInfo_(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TaskInfo_'):
     """TaskInfo message."""
 
     warmup_time_s: int

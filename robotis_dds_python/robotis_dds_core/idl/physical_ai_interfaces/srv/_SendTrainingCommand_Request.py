@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate
-from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import TrainingInfo as TrainingInfo
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg._TrainingInfo_ import TrainingInfo_
 
 
 @dataclass
@@ -22,6 +22,6 @@ class SendTrainingCommand_Request(idl.IdlStruct, typename='physical_ai_interface
     FINISH = 2
 
     command: int
-    training_info: TrainingInfo
+    training_info: TrainingInfo_
     resume: bool = False
     resume_model_path: str = ''

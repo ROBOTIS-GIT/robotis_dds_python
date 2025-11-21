@@ -5,16 +5,16 @@ from dataclasses import dataclass
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate
-from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import TrainingInfo
+from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg._TrainingInfo_ import TrainingInfo_
 
 
 @dataclass
 @annotate.final
 @annotate.autoid('sequential')
-class TrainingStatus(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TrainingStatus_'):
+class TrainingStatus_(idl.IdlStruct, typename='physical_ai_interfaces::msg::dds_::TrainingStatus_'):
     """TrainingStatus message."""
 
-    training_info: TrainingInfo
+    training_info: TrainingInfo_
     current_step: int
     current_loss: float
     is_training: bool = False
