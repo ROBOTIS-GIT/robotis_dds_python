@@ -4,8 +4,11 @@
   Module: std_msgs.msg
 
 """
+
 from ._Header_ import Header_
 from ._Float64MultiArray_ import Float64MultiArray_
 from ._MultiArrayLayout_ import MultiArrayLayout_
 from ._MultiArrayDimension_ import MultiArrayDimension_
-__all__ = ["Header_", "Float64MultiArray_", "MultiArrayLayout_", "MultiArrayDimension_", ]
+from ._String_ import String_
+
+__all__ = ["Header_", "Float64MultiArray_", "MultiArrayLayout_", "MultiArrayDimension_", "String_"]
