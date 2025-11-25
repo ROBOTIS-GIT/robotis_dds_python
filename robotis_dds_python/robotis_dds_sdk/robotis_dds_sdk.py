@@ -56,7 +56,7 @@ class RobotisDDSSDK:
         # Keeps track of already-subscribed default topics
         self._subscribed = {}
 
-        # Camera key → topic mapping
+        # Camera key → topic mapping in config.json
         # Example: { "cam_head": "/zed/left/image_raw/compressed" }
         self._camera_key_map = {}
 
@@ -91,7 +91,7 @@ class RobotisDDSSDK:
 
 
     # ---------------------------------------------------------
-    # Register camera dynamically (ONLY method to add cameras)
+    # Register camera dynamically
     # ---------------------------------------------------------
     def register_camera(self, key: str, topic: str, msg_type="CompressedImage_"):
         """
