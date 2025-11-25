@@ -9,7 +9,6 @@
 
 import threading
 import time
-import json
 import numpy as np
 import cv2
 
@@ -37,11 +36,12 @@ from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import (
 class RobotisDDSSDK:
     """
     Robotis DDS Python SDK
-    - Supports camera key mapping via config.json
-    - Provides unified access to sensors, cameras, publishers, and services
+    - NO JSON dependency
+    - Cameras are registered ONLY via register_camera()
+    - Unified access to sensors, cameras, publishers, and services
     """
 
-    def __init__(self, domain_id=30, camera_config_path="config.json"):
+    def __init__(self, domain_id=30):
         # DDS Node initialization
         self.node = DDSNode(
             name="robotis_sdk_node",
@@ -56,9 +56,12 @@ class RobotisDDSSDK:
         # Keeps track of already-subscribed default topics
         self._subscribed = {}
 
-        # Camera key → topic mapping (loaded from config.json)
+        # Camera key → topic mapping
         # Example: { "cam_head": "/zed/left/image_raw/compressed" }
         self._camera_key_map = {}
+
+        # Arm publishers
+        self._arm_pubs = {}
 
         # Default non-camera topics
         self.topic_map = {
@@ -68,9 +71,6 @@ class RobotisDDSSDK:
             "/joint_states": (JointState_, self._joint_state_callback),
             "/battery_state": (BatteryState_, self._battery_callback),
         }
-
-        # Load camera mappings from config.json and subscribe automatically
-        self._load_camera_config(camera_config_path)
 
         # Publishers
         self.cmd_vel_pub = self.node.dds_create_publisher("/cmd_vel", Twist_)
@@ -89,60 +89,39 @@ class RobotisDDSSDK:
         self.spin_thread = threading.Thread(target=self.node.dds_spin, daemon=True)
         self.spin_thread.start()
 
+
     # ---------------------------------------------------------
-    # Load camera topics from config.json
+    # Register camera dynamically (ONLY method to add cameras)
     # ---------------------------------------------------------
-    def _load_camera_config(self, config_path: str):
+    def register_camera(self, key: str, topic: str, msg_type="CompressedImage_"):
         """
-        Loads camera_topics from config.json.
-        Automatically registers subscriptions for each camera.
-
-        Expected structure:
-        {
-            "camera_topics": {
-                "cam_head": { "topic": "...", "type": "CompressedImage_" },
-                "cam_left": { "topic": "...", "type": "Image_" }
-            }
-        }
+        Register a camera subscription dynamically.
+        Args:
+            key: Camera identifier (e.g., "cam_head")
+            topic: DDS topic (e.g., "/zed/left/image_raw/compressed")
+            msg_type: "CompressedImage_" or "Image_"
         """
-        try:
-            with open(config_path, "r") as f:
-                cfg = json.load(f)
-        except Exception as e:
-            print(f"[RobotisDDSSDK] Failed to load camera config ({config_path}): {e}")
-            return
 
-        cam_cfg = cfg.get("camera_topics", {})
-        if not cam_cfg:
-            return
-
-        # Map type strings to actual message classes
         type_map = {
             "CompressedImage_": CompressedImage_,
             "Image_": Image_,
         }
 
-        # Register each camera key
-        for key, info in cam_cfg.items():
-            topic = info.get("topic")
-            type_name = info.get("type", "CompressedImage_")
-            if not topic:
-                continue
-            if type_name not in type_map:
-                print(f"[RobotisDDSSDK] Unknown camera type '{type_name}' for '{key}'")
-                continue
+        if msg_type not in type_map:
+            print(f"[RobotisDDSSDK] Unknown camera type '{msg_type}' for '{key}'")
+            return
 
-            msg_type = type_map[type_name]
-            self._camera_key_map[key] = topic
+        msg_class = type_map[msg_type]
+        self._camera_key_map[key] = topic
 
-            print(f"[RobotisDDSSDK] Camera loaded: key='{key}', topic='{topic}', type='{type_name}'")
+        print(f"[RobotisDDSSDK] Camera registered: key='{key}', topic='{topic}', type='{msg_type}'")
 
-            # Subscribe to the camera topic
-            self.node.dds_create_subscription(
-                topic,
-                msg_type,
-                lambda msg, k=key, t=type_name, tp=topic: self._camera_callback(k, t, tp, msg)
-            )
+        self.node.dds_create_subscription(
+            topic,
+            msg_class,
+            lambda msg, k=key, t=msg_type, tp=topic: self._camera_callback(k, t, tp, msg)
+        )
+
 
     # ---------------------------------------------------------
     # Lazy subscription for default topics
@@ -157,11 +136,11 @@ class RobotisDDSSDK:
         self.node.dds_create_subscription(topic, msg_type, cb)
         self._subscribed[topic] = True
 
+
     # ---------------------------------------------------------
     # Image Processing
     # ---------------------------------------------------------
     def _decode_compressed(self, msg):
-        """Decode CompressedImage_ into an ndarray."""
         try:
             data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
             img_np = np.frombuffer(data_bytes, dtype=np.uint8)
@@ -175,10 +154,6 @@ class RobotisDDSSDK:
             self.cache["/camera/image/compressed"] = frame
 
     def _camera_callback(self, key, type_name, topic, msg):
-        """
-        Unified camera callback for all user-defined cameras.
-        Automatically decodes compressed or raw formats.
-        """
         try:
             if type_name == "CompressedImage_":
                 frame = self._decode_compressed(msg)
@@ -199,7 +174,6 @@ class RobotisDDSSDK:
         except Exception as e:
             print(f"[RobotisDDSSDK] Camera callback error (key={key}, topic={topic}): {e}")
 
-    # Raw (non-config) image handler
     def _image_callback(self, msg):
         try:
             raw = bytes(msg.data) if isinstance(msg.data, list) else msg.data
@@ -215,6 +189,7 @@ class RobotisDDSSDK:
             self.cache["/camera/image"] = frame
         except:
             pass
+
 
     # ---------------------------------------------------------
     # Odometry, JointState, Battery
@@ -245,11 +220,11 @@ class RobotisDDSSDK:
             "percentage": msg.percentage,
         }
 
+
     # ---------------------------------------------------------
     # Getters
     # ---------------------------------------------------------
     def get(self, topic):
-        """Fetch cached value of a default DDS topic (lazy subscribe)."""
         self._ensure_subscription(topic)
         return self.cache.get(topic)
 
@@ -259,27 +234,26 @@ class RobotisDDSSDK:
     def get_joint_state(self): return self.get("/joint_states")
     def get_battery_state(self): return self.get("/battery_state")
 
+    def get_camera(self, key: str):
+        topic = self._camera_key_map.get(key)
+        if topic:
+            return self.cache.get(topic)
+        return None
+
     def get_images(self, keys=None):
-        """
-        Get camera frames using camera keys.
-
-        Example:
-            sdk.get_images(["cam_head", "cam_left"])
-
-        Returns:
-            { "cam_head": ndarray, "cam_left": ndarray }
-        """
         if keys is None:
             return self.cache
 
         out = {}
         for key in keys:
-            topic = self._camera_key_map.get(key)
-            if topic:
-                frame = self.cache.get(topic)
-                if frame is not None:
-                    out[key] = frame
+            frame = self.get_camera(key)
+            if frame is not None:
+                out[key] = frame
         return out
+
+    def get_camera_keys(self):
+        return list(self._camera_key_map.keys())
+
 
     # ---------------------------------------------------------
     # Publishers
@@ -297,21 +271,59 @@ class RobotisDDSSDK:
         nsec = int((now - sec) * 1e9)
 
         header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="base_link")
+
         point = JointTrajectoryPoint_(
             positions=positions,
-            velocities=[], accelerations=[], effort=[],
+            velocities=[],
+            accelerations=[],
+            effort=[],
             time_from_start=Time_(sec=1, nanosec=0),
         )
+
         msg = JointTrajectory_(
             header=header,
             joint_names=[f"joint_{i+1}" for i in range(len(positions))],
             points=[point],
         )
+
         self.joint_traj_pub.publish(msg)
 
-    def publish_inference_action(self, **fields):
-        msg = InferenceAction_(**fields)
-        self.inference_action_pub.publish(msg)
+
+    # ---------------------------------------------------------
+    # Arm publishers
+    # ---------------------------------------------------------
+    def register_arm_publisher(self, arm: str, topic: str):
+        pub = self.node.dds_create_publisher(topic, JointTrajectory_)
+        self._arm_pubs[arm] = pub
+        print(f"[RobotisDDSSDK] Arm publisher registered: {arm} → {topic}")
+
+    def send_arm_trajectory(self, arm: str, positions):
+        if arm not in self._arm_pubs:
+            print(f"[RobotisDDSSDK] ERROR: No arm publisher registered for '{arm}'")
+            return
+
+        now = time.time()
+        sec = int(now)
+        nsec = int((now - sec) * 1e9)
+
+        header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="base_link")
+
+        point = JointTrajectoryPoint_(
+            positions=positions,
+            velocities=[],
+            accelerations=[],
+            effort=[],
+            time_from_start=Time_(sec=1, nanosec=0),
+        )
+
+        msg = JointTrajectory_(
+            header=header,
+            joint_names=[f"{arm}_joint_{i+1}" for i in range(len(positions))],
+            points=[point],
+        )
+
+        self._arm_pubs[arm].publish(msg)
+
 
     # ---------------------------------------------------------
     # Services
