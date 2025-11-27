@@ -37,8 +37,7 @@ from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import (
 class RobotisDDSSDK:
     """
     Robotis DDS Python SDK
-    - NO JSON dependency
-    - Cameras are registered ONLY via register_camera()
+    - config.json의 robot_type 블록 기준으로 camera / arm / sensor 자동 등록
     - Unified access to sensors, cameras, publishers, and services
     """
 
@@ -61,16 +60,21 @@ class RobotisDDSSDK:
         # Example: { "cam_head": "/zed/left/image_raw/compressed" }
         self._camera_key_map = {}
 
-        # Arm publishers
+        # Arm publishers (left/right 등)
         self._arm_pubs = {}
 
-        # Default non-camera topics
+        # 기본 센서 토픽 (config로 override 가능)
+        self._odom_topic = "/odom"
+        self._joint_states_topic = "/joint_states"
+        self._battery_topic = "/battery_state"
+
+        # Default non-camera topics (키는 실제 DDS 토픽 이름)
         self.topic_map = {
             "/camera/image": (Image_, self._image_callback),
             "/camera/image/compressed": (CompressedImage_, self._compressed_image_callback),
-            "/odom": (Odometry_, self._odom_callback),
-            "/joint_states": (JointState_, self._joint_state_callback),
-            "/battery_state": (BatteryState_, self._battery_callback),
+            self._odom_topic: (Odometry_, self._odom_callback),
+            self._joint_states_topic: (JointState_, self._joint_state_callback),
+            self._battery_topic: (BatteryState_, self._battery_callback),
         }
 
         # Publishers
@@ -95,6 +99,9 @@ class RobotisDDSSDK:
         self.spin_thread = threading.Thread(target=self.node.dds_spin, daemon=True)
         self.spin_thread.start()
 
+    # ---------------------------------------------------------
+    # config.json 로드 + robot_type별 자동 등록
+    # ---------------------------------------------------------
     def _load_config_and_register(self, cfg_path="config.json"):
         try:
             with open(cfg_path, "r") as f:
@@ -120,6 +127,19 @@ class RobotisDDSSDK:
         rob_cfg = cfg[self.robot_type]
 
         # ===========================
+        # ⭐ other_sensors 처리 (예: joint_states)
+        # ===========================
+        other_cfg = rob_cfg.get("other_sensors", {})
+        joint_topic = other_cfg.get("joint_states")
+        if joint_topic:
+            self._joint_states_topic = joint_topic
+            # topic_map에 해당 토픽 매핑 추가/덮어쓰기
+            self.topic_map[joint_topic] = (JointState_, self._joint_state_callback)
+            print(f"[RobotisDDSSDK] JointState topic set to: {joint_topic}")
+
+        # (필요하면 odom, battery 등도 여기서 확장 가능)
+
+        # ===========================
         # ⭐ Camera 등록
         # ===========================
         cam_cfg = rob_cfg.get("camera_topics", {})
@@ -137,7 +157,6 @@ class RobotisDDSSDK:
             print(f"[RobotisDDSSDK] Auto-register arm publisher: {arm} → {topic}")
             self.register_arm_publisher(arm, topic)
 
-  
     # ---------------------------------------------------------
     # Lazy subscription for default topics
     # ---------------------------------------------------------
@@ -150,7 +169,6 @@ class RobotisDDSSDK:
         msg_type, cb = self.topic_map[topic]
         self.node.dds_create_subscription(topic, msg_type, cb)
         self._subscribed[topic] = True
-
 
     # ---------------------------------------------------------
     # Image Processing
@@ -169,6 +187,12 @@ class RobotisDDSSDK:
             self.cache["/camera/image/compressed"] = frame
 
     def _camera_callback(self, key, type_name, topic, msg):
+        """
+        camera_topics에서 등록한 카메라용 콜백
+        - key: cam_head / cam_left ...
+        - topic: 실제 DDS 토픽명
+        - type_name: "CompressedImage_" or "Image_"
+        """
         try:
             if type_name == "CompressedImage_":
                 frame = self._decode_compressed(msg)
@@ -182,6 +206,11 @@ class RobotisDDSSDK:
                     frame = arr.reshape((msg.height, msg.width, 3))
                     if msg.encoding == "rgb8":
                         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            # ⭐ 실제 프레임을 cache에 저장해야 get_images()가 쓸 수 있음
+            if frame is not None:
+                self.cache[topic] = frame
+
         except Exception as e:
             print(f"[RobotisDDSSDK] Camera callback error (key={key}, topic={topic}): {e}")
 
@@ -198,15 +227,14 @@ class RobotisDDSSDK:
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             self.cache["/camera/image"] = frame
-        except:
+        except Exception:
             pass
-
 
     # ---------------------------------------------------------
     # Odometry, JointState, Battery
     # ---------------------------------------------------------
     def _odom_callback(self, msg: Odometry_):
-        self.cache["/odom"] = {
+        self.cache[self._odom_topic] = {
             "x": msg.pose.pose.position.x,
             "y": msg.pose.pose.position.y,
             "theta": msg.pose.pose.orientation.z,
@@ -216,21 +244,20 @@ class RobotisDDSSDK:
 
     def _joint_state_callback(self, msg: JointState_):
         try:
-            self.cache["/joint_states"] = {
+            self.cache[self._joint_states_topic] = {
                 "name": list(msg.name),
                 "position": list(msg.position),
                 "velocity": list(msg.velocity),
                 "effort": list(msg.effort),
             }
         except Exception:
-            self.cache["/joint_states"] = None
+            self.cache[self._joint_states_topic] = None
 
     def _battery_callback(self, msg: BatteryState_):
-        self.cache["/battery_state"] = {
+        self.cache[self._battery_topic] = {
             "voltage": msg.voltage,
             "percentage": msg.percentage,
         }
-
 
     # ---------------------------------------------------------
     # Getters
@@ -239,11 +266,21 @@ class RobotisDDSSDK:
         self._ensure_subscription(topic)
         return self.cache.get(topic)
 
-    def get_image(self): return self.get("/camera/image")
-    def get_rgb_image(self): return self.get("/camera/image/compressed")
-    def get_odometry(self): return self.get("/odom")
-    def get_joint_state(self): return self.get("/joint_states")
-    def get_battery_state(self): return self.get("/battery_state")
+    def get_image(self):
+        return self.get("/camera/image")
+
+    def get_rgb_image(self):
+        return self.get("/camera/image/compressed")
+
+    def get_odometry(self):
+        return self.get(self._odom_topic)
+
+    def get_joint_state(self):
+        # other_sensors.joint_states 값이 있으면 그 토픽을 사용
+        return self.get(self._joint_states_topic)
+
+    def get_battery_state(self):
+        return self.get(self._battery_topic)
 
     def get_camera(self, key: str):
         topic = self._camera_key_map.get(key)
@@ -255,6 +292,7 @@ class RobotisDDSSDK:
         """
         Always return all camera frames defined in camera_topics
         from the loaded config.json.
+        ex) {"cam_head": np.ndarray, "cam_left": np.ndarray, ...}
         """
         keys = list(self._camera_key_map.keys())
 
@@ -268,7 +306,6 @@ class RobotisDDSSDK:
                 out[key] = frame
         return out
 
-
     # ---------------------------------------------------------
     # Publishers
     # ---------------------------------------------------------
@@ -280,6 +317,10 @@ class RobotisDDSSDK:
         self.cmd_vel_pub.publish(msg)
 
     def send_joint_trajectory(self, positions):
+        """
+        기본 /joint_trajectory 토픽으로 전체 팔(또는 1개의 팔)을 보내고 싶을 때 사용.
+        (로봇별 left/right 분리는 send_arm_trajectory 사용)
+        """
         now = time.time()
         sec = int(now)
         nsec = int((now - sec) * 1e9)
@@ -302,20 +343,18 @@ class RobotisDDSSDK:
 
         self.joint_traj_pub.publish(msg)
 
-
     # ---------------------------------------------------------
     # Arm publishers
     # ---------------------------------------------------------
     def register_camera(self, key, topic, type_name="CompressedImage_"):
         """
-        Register a camera topic manually.
+        Register a camera topic (usually from config.json → camera_topics).
         key: logical name (cam_head, cam_left, ...)
         topic: DDS topic name
         type_name: 'CompressedImage_' or 'Image_'
         """
         self._camera_key_map[key] = topic
 
-        # DDS subscription 생성
         if type_name == "CompressedImage_":
             msg_type = CompressedImage_
         else:
@@ -332,12 +371,16 @@ class RobotisDDSSDK:
     def register_arm_publisher(self, arm: str, topic: str):
         """
         Register an arm trajectory publisher dynamically.
+        ex) arm='left', topic='/joint_trajectory_left'
         """
         pub = self.node.dds_create_publisher(topic, JointTrajectory_)
         self._arm_pubs[arm] = pub
         print(f"[RobotisDDSSDK] Arm publisher registered: {arm} → {topic}")
 
     def send_arm_trajectory(self, arm: str, positions):
+        """
+        로봇 타입별 팔(왼팔/오른팔 등)에 맞게 config.arm_publishers 기준으로 퍼블리시.
+        """
         if arm not in self._arm_pubs:
             print(f"[RobotisDDSSDK] ERROR: No arm publisher registered for '{arm}'")
             return
@@ -363,7 +406,6 @@ class RobotisDDSSDK:
         )
 
         self._arm_pubs[arm].publish(msg)
-
 
     # ---------------------------------------------------------
     # Services
