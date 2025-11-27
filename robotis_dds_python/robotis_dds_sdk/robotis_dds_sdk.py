@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# Robotis DDS Python SDK + DDS Inference Server
+# High-level wrapper for DDS-based robot communication + Inference integration
+#
+# Author: Heewon Lee, Dongyun Kim
+# License: Apache 2.0
 
 import threading
 import time
