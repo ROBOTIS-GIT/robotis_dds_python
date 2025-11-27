@@ -32,15 +32,6 @@ from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import I
 
 
 class RobotisDDSSDK:
-    """
-    Minimal DDS SDK wrapper.
-    Uses config.json[robot_type] to auto-register:
-      - camera_topics (add new cameras by editing config.json)
-      - arm_publishers
-      - other_sensors (e.g. joint_states)
-    Access cached data via getters. Publish motion via send_cmd_vel / send_arm_trajectory.
-    """
-
     def __init__(self, domain_id=30, robot_type=None):
         self.node = DDSNode(
             name="robotis_sdk_node",
@@ -57,7 +48,7 @@ class RobotisDDSSDK:
         self._camera_key_map = {}
         self._arm_pubs = {}
 
-        # Default topics (can be overridden by config)
+        # Default topics
         self._odom_topic = "/odom"
         self._joint_states_topic = "/joint_states"
         self._battery_topic = "/battery_state"
@@ -98,12 +89,6 @@ class RobotisDDSSDK:
         if not self.robot_type or self.robot_type not in cfg:
             return
         rob_cfg = cfg[self.robot_type]
-
-        # other_sensors (override joint_states topic)
-        joint_topic = rob_cfg.get("other_sensors", {}).get("joint_states")
-        if joint_topic:
-            self._joint_states_topic = joint_topic
-            self.topic_map[joint_topic] = (JointState_, self._joint_state_callback)
 
         # camera_topics (add new cameras by editing config.json)
         for key, v in rob_cfg.get("camera_topics", {}).items():
