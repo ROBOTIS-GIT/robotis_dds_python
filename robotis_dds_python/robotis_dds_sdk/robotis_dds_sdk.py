@@ -11,6 +11,7 @@ import threading
 import time
 import numpy as np
 import cv2
+import json
 
 from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
 from robotis_dds_python.robotis_dds_core.idl.sensor_msgs.msg import (
@@ -41,7 +42,7 @@ class RobotisDDSSDK:
     - Unified access to sensors, cameras, publishers, and services
     """
 
-    def __init__(self, domain_id=30):
+    def __init__(self, domain_id=30, robot_type=None):
         # DDS Node initialization
         self.node = DDSNode(
             name="robotis_sdk_node",
@@ -85,44 +86,58 @@ class RobotisDDSSDK:
             "/inference/kill", Kill_Request, Kill_Response
         )
 
+        # ========= ⭐ config.json 로드 + 자동 등록 ⭐ =========
+        self.robot_type = robot_type
+        self._load_config_and_register()
+        print(f"[RobotisDDSSDK] Camera map after config: {self._camera_key_map}")
+
         # Spin thread
         self.spin_thread = threading.Thread(target=self.node.dds_spin, daemon=True)
         self.spin_thread.start()
 
-
-    # ---------------------------------------------------------
-    # Register camera dynamically
-    # ---------------------------------------------------------
-    def register_camera(self, key: str, topic: str, msg_type="CompressedImage_"):
-        """
-        Register a camera subscription dynamically.
-        Args:
-            key: Camera identifier (e.g., "cam_head")
-            topic: DDS topic (e.g., "/zed/left/image_raw/compressed")
-            msg_type: "CompressedImage_" or "Image_"
-        """
-
-        type_map = {
-            "CompressedImage_": CompressedImage_,
-            "Image_": Image_,
-        }
-
-        if msg_type not in type_map:
-            print(f"[RobotisDDSSDK] Unknown camera type '{msg_type}' for '{key}'")
+    def _load_config_and_register(self, cfg_path="config.json"):
+        try:
+            with open(cfg_path, "r") as f:
+                cfg = json.load(f)
+        except FileNotFoundError:
+            print(f"[RobotisDDSSDK] WARNING: {cfg_path} not found → config not applied.")
+            return
+        except Exception as e:
+            print(f"[RobotisDDSSDK] ERROR: Failed to load {cfg_path}: {e}")
             return
 
-        msg_class = type_map[msg_type]
-        self._camera_key_map[key] = topic
+        # -----------------------------
+        # ⭐ 로봇 타입 선택 (필수)
+        # -----------------------------
+        if self.robot_type is None:
+            print(f"[RobotisDDSSDK] WARNING: robot_type not provided — config not applied.")
+            return
 
-        print(f"[RobotisDDSSDK] Camera registered: key='{key}', topic='{topic}', type='{msg_type}'")
+        if self.robot_type not in cfg:
+            print(f"[RobotisDDSSDK] WARNING: Robot type '{self.robot_type}' not found in config.json")
+            return
 
-        self.node.dds_create_subscription(
-            topic,
-            msg_class,
-            lambda msg, k=key, t=msg_type, tp=topic: self._camera_callback(k, t, tp, msg)
-        )
+        rob_cfg = cfg[self.robot_type]
 
+        # ===========================
+        # ⭐ Camera 등록
+        # ===========================
+        cam_cfg = rob_cfg.get("camera_topics", {})
+        for key, v in cam_cfg.items():
+            topic = v.get("topic")
+            msg_type = v.get("type", "CompressedImage_")
+            print(f"[RobotisDDSSDK] Auto-register camera: {key} → {topic} ({msg_type})")
+            self.register_camera(key, topic, msg_type)
 
+        # ===========================
+        # ⭐ Arm publisher 등록
+        # ===========================
+        arm_cfg = rob_cfg.get("arm_publishers", {})
+        for arm, topic in arm_cfg.items():
+            print(f"[RobotisDDSSDK] Auto-register arm publisher: {arm} → {topic}")
+            self.register_arm_publisher(arm, topic)
+
+  
     # ---------------------------------------------------------
     # Lazy subscription for default topics
     # ---------------------------------------------------------
@@ -167,10 +182,6 @@ class RobotisDDSSDK:
                     frame = arr.reshape((msg.height, msg.width, 3))
                     if msg.encoding == "rgb8":
                         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-            if frame is not None:
-                self.cache[topic] = frame
-
         except Exception as e:
             print(f"[RobotisDDSSDK] Camera callback error (key={key}, topic={topic}): {e}")
 
@@ -240,19 +251,22 @@ class RobotisDDSSDK:
             return self.cache.get(topic)
         return None
 
-    def get_images(self, keys=None):
-        if keys is None:
-            return self.cache
+    def get_images(self):
+        """
+        Always return all camera frames defined in camera_topics
+        from the loaded config.json.
+        """
+        keys = list(self._camera_key_map.keys())
 
         out = {}
         for key in keys:
-            frame = self.get_camera(key)
+            topic = self._camera_key_map.get(key)
+            if topic is None:
+                continue
+            frame = self.cache.get(topic)
             if frame is not None:
                 out[key] = frame
         return out
-
-    def get_camera_keys(self):
-        return list(self._camera_key_map.keys())
 
 
     # ---------------------------------------------------------
@@ -292,7 +306,33 @@ class RobotisDDSSDK:
     # ---------------------------------------------------------
     # Arm publishers
     # ---------------------------------------------------------
+    def register_camera(self, key, topic, type_name="CompressedImage_"):
+        """
+        Register a camera topic manually.
+        key: logical name (cam_head, cam_left, ...)
+        topic: DDS topic name
+        type_name: 'CompressedImage_' or 'Image_'
+        """
+        self._camera_key_map[key] = topic
+
+        # DDS subscription 생성
+        if type_name == "CompressedImage_":
+            msg_type = CompressedImage_
+        else:
+            msg_type = Image_
+
+        # key, type_name, topic을 callback에 전달할 수 있도록 wrapper 생성
+        def cb(msg, k=key, t=topic, ty=type_name):
+            self._camera_callback(k, ty, t, msg)
+
+        print(f"[RobotisDDSSDK] Registering camera subscription: key={key}, topic={topic}, type={type_name}")
+        self.node.dds_create_subscription(topic, msg_type, cb)
+        print(f"[RobotisDDSSDK] Camera registered: {key} → {topic}")
+
     def register_arm_publisher(self, arm: str, topic: str):
+        """
+        Register an arm trajectory publisher dynamically.
+        """
         pub = self.node.dds_create_publisher(topic, JointTrajectory_)
         self._arm_pubs[arm] = pub
         print(f"[RobotisDDSSDK] Arm publisher registered: {arm} → {topic}")
