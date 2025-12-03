@@ -14,6 +14,7 @@ import cv2
 import json
 
 from robotis_dds_python.robotis_dds_core.tools.dds_node import DDSNode
+from robotis_dds_python.robotis_dds_core.idl.builtin_interfaces.msg import Time_, Duration_
 from robotis_dds_python.robotis_dds_core.idl.sensor_msgs.msg import (
     CompressedImage_, Image_, JointState_, BatteryState_
 )
@@ -47,6 +48,9 @@ class RobotisDDSSDK:
         # Mappings
         self._camera_key_map = {}
         self._arm_pubs = {}
+        # Per-arm trajectory epoch (monotonic), ensures increasing time_from_start across publishes
+        self._arm_traj_epoch_ns = {}  # arm -> int (start time_ns)
+        self._arm_last_tfs_ns = {}    # arm -> int (last time_from_start in ns)
 
         # Default topics
         self._odom_topic = "/odom"
@@ -81,6 +85,7 @@ class RobotisDDSSDK:
 
     # ---------------- Config loader ----------------
     def _load_config_and_register(self, cfg_path="config.json"):
+    
         try:
             with open(cfg_path, "r") as f:
                 cfg = json.load(f)
@@ -222,23 +227,35 @@ class RobotisDDSSDK:
         )
         self.cmd_vel_pub.publish(msg)
 
-    def send_joint_trajectory(self, positions):
+    def _make_timestamp(self):
+        """system time 기반 ROS2 Time stamp 생성 (DDS 환경에서 가장 안전한 방식)"""
         now = time.time()
         sec = int(now)
         nsec = int((now - sec) * 1e9)
-        header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="base_link")
+        return time(sec=sec, nanosec=nsec)
+
+    def send_joint_trajectory(self, positions):
+        # --- FIXED: 올바른 timestamp 생성 ---
+        stamp = self._make_timestamp()
+        header = Header_(stamp=stamp, frame_id="")
+
+        # trajectory point
         point = JointTrajectoryPoint_(
             positions=positions,
             velocities=[],
             accelerations=[],
             effort=[],
-            time_from_start=Time_(sec=1, nanosec=0),
+            time_from_start=Time_(sec=0, nanosec=0),
         )
+
+        # full message
         msg = JointTrajectory_(
             header=header,
             joint_names=[f"joint_{i+1}" for i in range(len(positions))],
             points=[point],
         )
+
+        # publish
         self.joint_traj_pub.publish(msg)
 
     # ---------------- Camera / Arm registration ----------------
@@ -258,27 +275,93 @@ class RobotisDDSSDK:
     def register_arm_publisher(self, arm: str, topic: str):
         pub = self.node.dds_create_publisher(topic, JointTrajectory_)
         self._arm_pubs[arm] = pub
+        # initialize monotonic epoch and last tfs
+        now_ns = time.monotonic_ns()
+        self._arm_traj_epoch_ns[arm] = now_ns
+        self._arm_last_tfs_ns[arm] = 0
 
-    def send_arm_trajectory(self, arm: str, positions):
+    def reset_arm_tfs(self, arm: str):
+        """
+        Reset stored time_from_start for given arm.
+        Call this after controller restart or when invalid trajectory error occurred.
+        """
+        self._arm_traj_epoch_ns[arm] = time.monotonic_ns()
+        self._arm_last_tfs_ns[arm] = 0
+
+    def send_arm_trajectory(self, arm: str, positions, dt: float = 0.03, velocities=None, fast_mode: bool = True):
+        """
+        Publish a trajectory ensuring time_from_start is strictly increasing across calls.
+        """
         if arm not in self._arm_pubs:
             return
-        now = time.time()
-        sec = int(now)
-        nsec = int((now - sec) * 1e9)
-        header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="base_link")
-        point = JointTrajectoryPoint_(
-            positions=positions,
-            velocities=[],
-            accelerations=[],
-            effort=[],
-            time_from_start=Time_(sec=1, nanosec=0),
-        )
-        msg = JointTrajectory_(
-            header=header,
-            joint_names=[f"{arm}_joint_{i+1}" for i in range(len(positions))],
-            points=[point],
-        )
-        self._arm_pubs[arm].publish(msg)
+
+        # Header stamp
+        t_wall = time.time()
+        sec = int(t_wall)
+        nsec = int((t_wall - sec) * 1e9)
+        header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="")
+
+        # Normalize inputs
+        is_multi = isinstance(positions[0], (list, tuple))
+        pos_list = positions if is_multi else [positions]
+        vel_list = None
+        if velocities is not None:
+            vel_list = velocities if isinstance(velocities[0], (list, tuple)) else [velocities]
+            if len(vel_list) != len(pos_list):
+                vel_list = None
+
+        # Controller buffer delay
+        dt = max(0.01, float(dt))
+        base_delay = max(dt, 0.06) if fast_mode else max(dt, 0.12)
+
+        # Compute points with strictly increasing time_from_start
+        points = []
+        last_tfs_ns = self._arm_last_tfs_ns.get(arm, 0)
+        if arm not in self._arm_traj_epoch_ns:
+            self._arm_traj_epoch_ns[arm] = time.monotonic_ns()
+            last_tfs_ns = 0
+
+        # Gap between batches: keep strictly greater than previous
+        batch_gap_ns = int((0.02 if fast_mode else 0.05) * 1e9)
+        start_ns = max(last_tfs_ns + batch_gap_ns, int(base_delay * 1e9))
+
+        for i, pos in enumerate(pos_list):
+            tfs_ns = start_ns + int(i * dt * 1e9)
+            vels = vel_list[i] if vel_list else []
+            points.append(
+                JointTrajectoryPoint_(
+                    positions=list(pos),
+                    velocities=list(vels),
+                    accelerations=[],
+                    effort=[],
+                    time_from_start=Duration_(sec=tfs_ns // 1_000_000_000, nanosec=tfs_ns % 1_000_000_000),
+                )
+            )
+
+        # Build and publish message; update last_tfs_ns only on success
+        try:
+            JOINT_NAME_MAP = {
+                "left": [
+                    'arm_l_joint1','arm_l_joint2','arm_l_joint3','arm_l_joint4',
+                    'arm_l_joint5','arm_l_joint6','arm_l_joint7','gripper_l_joint1'
+                ],
+                "right": [
+                    'arm_r_joint1','arm_r_joint2','arm_r_joint3','arm_r_joint4',
+                    'arm_r_joint5','arm_r_joint6','arm_r_joint7','gripper_r_joint1'
+                ]
+            }
+            msg = JointTrajectory_(
+                header=header,
+                joint_names=JOINT_NAME_MAP.get(arm, []),
+                points=points,
+            )
+            self._arm_pubs[arm].publish(msg)
+            # Update stored last time_from_start (ns)
+            last_point = points[-1].time_from_start
+            self._arm_last_tfs_ns[arm] = last_point.sec * 1_000_000_000 + last_point.nanosec
+        except Exception as e:
+            # If publish fails (e.g., node shut down), avoid using dead context
+            print(f"[ERROR] send_arm_trajectory({arm}) failed: {e}")
 
     # ---------------- Services ----------------
     def ping(self):
