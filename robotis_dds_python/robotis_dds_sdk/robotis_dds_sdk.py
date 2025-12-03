@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
-# Robotis DDS Python SDK + DDS Inference Server
-# High-level wrapper for DDS-based robot communication + Inference integration
+# Copyright 2025 ROBOTIS CO., LTD.
 #
-# Author: Heewon Lee, Dongyun Kim
-# License: Apache 2.0
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Author: Heewon Lee
 
 import threading
 import time
@@ -24,7 +27,6 @@ from robotis_dds_python.robotis_dds_core.idl.trajectory_msgs.msg import (
     JointTrajectory_, JointTrajectoryPoint_
 )
 from robotis_dds_python.robotis_dds_core.idl.std_msgs.msg import Header_
-from robotis_dds_python.robotis_dds_core.idl.builtin_interfaces.msg import Time_
 from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.srv import (
     Ping_Request, Ping_Response,
     Kill_Request, Kill_Response,
@@ -33,7 +35,10 @@ from robotis_dds_python.robotis_dds_core.idl.physical_ai_interfaces.msg import I
 
 
 class RobotisDDSSDK:
+    """High-level DDS wrapper for Robot sensors & actuators."""
+
     def __init__(self, domain_id=30, robot_type=None):
+        # --- Create DDS node ---
         self.node = DDSNode(
             name="robotis_sdk_node",
             domain_id=domain_id,
@@ -41,23 +46,22 @@ class RobotisDDSSDK:
             allow_multicast=True,
         )
 
-        # Caches
+        # --- Cache for last sensor values ---
         self.cache = {}
         self._subscribed = {}
 
-        # Mappings
-        self._camera_key_map = {}
-        self._arm_pubs = {}
-        # Per-arm trajectory epoch (monotonic), ensures increasing time_from_start across publishes
-        self._arm_traj_epoch_ns = {}  # arm -> int (start time_ns)
-        self._arm_last_tfs_ns = {}    # arm -> int (last time_from_start in ns)
+        # --- Mappings for cameras & arm publishers ---
+        self._camera_key_map = {}   # key → topic
+        self._arm_pubs = {}         # arm → publisher
+        self._arm_traj_epoch_ns = {}  # arm → time_from_start epoch
+        self._arm_last_tfs_ns = {}     # arm → last TFS ns
 
-        # Default topics
+        # --- Default topics ---
         self._odom_topic = "/odom"
         self._joint_states_topic = "/joint_states"
         self._battery_topic = "/battery_state"
 
-        # Lazy-subscribe topic map
+        # --- Lazy subscription mapping ---
         self.topic_map = {
             "/camera/image": (Image_, self._image_callback),
             "/camera/image/compressed": (CompressedImage_, self._compressed_image_callback),
@@ -66,69 +70,88 @@ class RobotisDDSSDK:
             self._battery_topic: (BatteryState_, self._battery_callback),
         }
 
-        # Publishers
+        # --- Publishers ---
         self.cmd_vel_pub = self.node.dds_create_publisher("/cmd_vel", Twist_)
         self.joint_traj_pub = self.node.dds_create_publisher("/joint_trajectory", JointTrajectory_)
         self.inference_action_pub = self.node.dds_create_publisher("/inference/action", InferenceAction_)
 
-        # Services
+        # --- Service Clients ---
         self.ping_client = self.node.dds_create_client("/inference/ping", Ping_Request, Ping_Response)
         self.kill_client = self.node.dds_create_client("/inference/kill", Kill_Request, Kill_Response)
 
-        # Config-based auto registration
+        # Robot type for config.json auto-registration
         self.robot_type = robot_type
+
+        # --- Load configuration & register sensors/publishers ---
         self._load_config_and_register()
 
-        # Spin
+        # --- DDS spin thread ---
         self.spin_thread = threading.Thread(target=self.node.dds_spin, daemon=True)
         self.spin_thread.start()
 
-    # ---------------- Config loader ----------------
+    # ------------------------------------------------------------
+    # Config loader: Reads config.json and registers cameras/arms
+    # ------------------------------------------------------------
     def _load_config_and_register(self, cfg_path="config.json"):
-    
+        """
+        Load config.json (auto camera & publisher registration).
+        WARNING:
+            * Modify config.json instead of touching SDK code.
+        """
         try:
             with open(cfg_path, "r") as f:
                 cfg = json.load(f)
-        except Exception:
+        except:
             return
+
         if not self.robot_type or self.robot_type not in cfg:
             return
+
         rob_cfg = cfg[self.robot_type]
 
-        # camera_topics (add new cameras by editing config.json)
+        # --- Register cameras from config.json ---
         for key, v in rob_cfg.get("camera_topics", {}).items():
             topic = v.get("topic")
             msg_type = v.get("type", "CompressedImage_")
             if topic:
                 self.register_camera(key, topic, msg_type)
 
-        # arm_publishers
+        # --- Register arm publishers from config.json ---
         for arm, topic in rob_cfg.get("arm_publishers", {}).items():
             self.register_arm_publisher(arm, topic)
 
-    # ---------------- Subscription helpers ----------------
+    # ------------------------------------------------------------
+    # Subscription helpers
+    # ------------------------------------------------------------
     def _ensure_subscription(self, topic):
+        """Create subscription on first access."""
         if topic in self._subscribed or topic not in self.topic_map:
             return
         msg_type, cb = self.topic_map[topic]
         self.node.dds_create_subscription(topic, msg_type, cb)
         self._subscribed[topic] = True
 
-    # ---------------- Image decoding ----------------
+    # ------------------------------------------------------------
+    # Image decoding utilities
+    # ------------------------------------------------------------
     def _decode_compressed(self, msg):
+        """Decode sensor_msgs/CompressedImage into OpenCV BGR frame."""
         try:
             data_bytes = bytes(msg.data) if isinstance(msg.data, list) else msg.data
             arr = np.frombuffer(data_bytes, dtype=np.uint8)
             return cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        except Exception:
+        except:
             return None
 
+    # DDS callback for /camera/image/compressed
     def _compressed_image_callback(self, msg):
         frame = self._decode_compressed(msg)
         if frame is not None:
             self.cache["/camera/image/compressed"] = frame
 
+    # Generic callback for custom cameras registered via config.json
     def _camera_callback(self, key, type_name, topic, msg):
+        """Unified callback handler for all cameras registered from config.json."""
         try:
             if type_name == "CompressedImage_":
                 frame = self._decode_compressed(msg)
@@ -143,10 +166,12 @@ class RobotisDDSSDK:
                         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             if frame is not None:
                 self.cache[topic] = frame
-        except Exception:
+        except:
             pass
 
+    # DDS callback for raw /camera/image
     def _image_callback(self, msg):
+        """Decode Image_ messages."""
         try:
             raw = bytes(msg.data) if isinstance(msg.data, list) else msg.data
             arr = np.frombuffer(raw, dtype=np.uint8)
@@ -157,11 +182,14 @@ class RobotisDDSSDK:
                 if msg.encoding == "rgb8":
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             self.cache["/camera/image"] = frame
-        except Exception:
+        except:
             pass
 
-    # ---------------- Sensor callbacks ----------------
+    # ------------------------------------------------------------
+    # Sensor callbacks
+    # ------------------------------------------------------------
     def _odom_callback(self, msg: Odometry_):
+        """Cache odometry values."""
         self.cache[self._odom_topic] = {
             "x": msg.pose.pose.position.x,
             "y": msg.pose.pose.position.y,
@@ -171,6 +199,7 @@ class RobotisDDSSDK:
         }
 
     def _joint_state_callback(self, msg: JointState_):
+        """Cache full joint state."""
         try:
             self.cache[self._joint_states_topic] = {
                 "name": list(msg.name),
@@ -178,17 +207,21 @@ class RobotisDDSSDK:
                 "velocity": list(msg.velocity),
                 "effort": list(msg.effort),
             }
-        except Exception:
+        except:
             self.cache[self._joint_states_topic] = None
 
     def _battery_callback(self, msg: BatteryState_):
+        """Cache battery percentage & voltage."""
         self.cache[self._battery_topic] = {
             "voltage": msg.voltage,
             "percentage": msg.percentage,
         }
 
-    # ---------------- Getters ----------------
+    # ------------------------------------------------------------
+    # Public getters (auto lazy-subscribe)
+    # ------------------------------------------------------------
     def get(self, topic):
+        """Retrieve cached data (ensures subscription)."""
         self._ensure_subscription(topic)
         return self.cache.get(topic)
 
@@ -208,10 +241,12 @@ class RobotisDDSSDK:
         return self.get(self._battery_topic)
 
     def get_camera(self, key: str):
+        """Get camera frame by config.json name."""
         topic = self._camera_key_map.get(key)
         return self.cache.get(topic) if topic else None
 
     def get_images(self):
+        """Return all registered camera frames as dict(key → frame)."""
         out = {}
         for key, topic in self._camera_key_map.items():
             frame = self.cache.get(topic)
@@ -219,8 +254,11 @@ class RobotisDDSSDK:
                 out[key] = frame
         return out
 
-    # ---------------- Publishers ----------------
+    # ------------------------------------------------------------
+    # Publishers
+    # ------------------------------------------------------------
     def send_cmd_vel(self, linear_x, angular_z):
+        """Publish Twist command on /cmd_vel."""
         msg = Twist_(
             linear=Vector3_(x=linear_x, y=0.0, z=0.0),
             angular=Vector3_(x=0.0, y=0.0, z=angular_z),
@@ -228,18 +266,17 @@ class RobotisDDSSDK:
         self.cmd_vel_pub.publish(msg)
 
     def _make_timestamp(self):
-        """system time 기반 ROS2 Time stamp 생성 (DDS 환경에서 가장 안전한 방식)"""
+        """Generate ROS2-style timestamp from system wall clock."""
         now = time.time()
         sec = int(now)
         nsec = int((now - sec) * 1e9)
-        return time(sec=sec, nanosec=nsec)
+        return Time_(sec=sec, nanosec=nsec)
 
     def send_joint_trajectory(self, positions):
-        # --- FIXED: 올바른 timestamp 생성 ---
+        """Publish a single joint trajectory command."""
         stamp = self._make_timestamp()
         header = Header_(stamp=stamp, frame_id="")
 
-        # trajectory point
         point = JointTrajectoryPoint_(
             positions=positions,
             velocities=[],
@@ -248,21 +285,21 @@ class RobotisDDSSDK:
             time_from_start=Time_(sec=0, nanosec=0),
         )
 
-        # full message
         msg = JointTrajectory_(
             header=header,
             joint_names=[f"joint_{i+1}" for i in range(len(positions))],
             points=[point],
         )
 
-        # publish
         self.joint_traj_pub.publish(msg)
 
-    # ---------------- Camera / Arm registration ----------------
+    # ------------------------------------------------------------
+    # Camera / Arm registration (config.json-driven)
+    # ------------------------------------------------------------
     def register_camera(self, key, topic, type_name="CompressedImage_"):
         """
-        Register a camera manually.
-        To add permanently: edit config.json camera_topics block.
+        Register a camera from config.json.
+        DO NOT modify code; edit config.json under camera_topics.
         """
         self._camera_key_map[key] = topic
         msg_type = CompressedImage_ if type_name == "CompressedImage_" else Image_
@@ -273,58 +310,59 @@ class RobotisDDSSDK:
         self.node.dds_create_subscription(topic, msg_type, cb)
 
     def register_arm_publisher(self, arm: str, topic: str):
+        """Create publisher for arm trajectory (configured via config.json)."""
         pub = self.node.dds_create_publisher(topic, JointTrajectory_)
         self._arm_pubs[arm] = pub
-        # initialize monotonic epoch and last tfs
+
+        # Initialize time_from_start tracking
         now_ns = time.monotonic_ns()
         self._arm_traj_epoch_ns[arm] = now_ns
         self._arm_last_tfs_ns[arm] = 0
 
     def reset_arm_tfs(self, arm: str):
-        """
-        Reset stored time_from_start for given arm.
-        Call this after controller restart or when invalid trajectory error occurred.
-        """
+        """Reset time_from_start counter (required after controller restart)."""
         self._arm_traj_epoch_ns[arm] = time.monotonic_ns()
         self._arm_last_tfs_ns[arm] = 0
 
+    # ------------------------------------------------------------
+    # Trajectory publishing with strict time_from_start increments
+    # ------------------------------------------------------------
     def send_arm_trajectory(self, arm: str, positions, dt: float = 0.03, velocities=None, fast_mode: bool = True):
         """
-        Publish a trajectory ensuring time_from_start is strictly increasing across calls.
+        Publish JointTrajectory ensuring:
+        * time_from_start strictly increases (required by ros2_control)
+        * Optional velocities per point
         """
         if arm not in self._arm_pubs:
             return
 
-        # Header stamp
+        # --- Header stamp ---
         t_wall = time.time()
         sec = int(t_wall)
         nsec = int((t_wall - sec) * 1e9)
         header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="")
 
-        # Normalize inputs
+        # --- Normalize input ---
         is_multi = isinstance(positions[0], (list, tuple))
         pos_list = positions if is_multi else [positions]
+
         vel_list = None
         if velocities is not None:
             vel_list = velocities if isinstance(velocities[0], (list, tuple)) else [velocities]
             if len(vel_list) != len(pos_list):
                 vel_list = None
 
-        # Controller buffer delay
+        # --- Controller timing ---
         dt = max(0.01, float(dt))
         base_delay = max(dt, 0.06) if fast_mode else max(dt, 0.12)
 
-        # Compute points with strictly increasing time_from_start
-        points = []
         last_tfs_ns = self._arm_last_tfs_ns.get(arm, 0)
-        if arm not in self._arm_traj_epoch_ns:
-            self._arm_traj_epoch_ns[arm] = time.monotonic_ns()
-            last_tfs_ns = 0
 
-        # Gap between batches: keep strictly greater than previous
+        # Ensure strictly increasing monotonic tfs
         batch_gap_ns = int((0.02 if fast_mode else 0.05) * 1e9)
         start_ns = max(last_tfs_ns + batch_gap_ns, int(base_delay * 1e9))
 
+        points = []
         for i, pos in enumerate(pos_list):
             tfs_ns = start_ns + int(i * dt * 1e9)
             vels = vel_list[i] if vel_list else []
@@ -334,11 +372,12 @@ class RobotisDDSSDK:
                     velocities=list(vels),
                     accelerations=[],
                     effort=[],
-                    time_from_start=Duration_(sec=tfs_ns // 1_000_000_000, nanosec=tfs_ns % 1_000_000_000),
+                    time_from_start=Duration_(sec=tfs_ns // 1_000_000_000,
+                                              nanosec=tfs_ns % 1_000_000_000),
                 )
             )
 
-        # Build and publish message; update last_tfs_ns only on success
+        # --- Final publish ---
         try:
             JOINT_NAME_MAP = {
                 "left": [
@@ -350,27 +389,34 @@ class RobotisDDSSDK:
                     'arm_r_joint5','arm_r_joint6','arm_r_joint7','gripper_r_joint1'
                 ]
             }
+
             msg = JointTrajectory_(
                 header=header,
                 joint_names=JOINT_NAME_MAP.get(arm, []),
                 points=points,
             )
+
             self._arm_pubs[arm].publish(msg)
-            # Update stored last time_from_start (ns)
+
+            # Update last tfs
             last_point = points[-1].time_from_start
             self._arm_last_tfs_ns[arm] = last_point.sec * 1_000_000_000 + last_point.nanosec
+
         except Exception as e:
-            # If publish fails (e.g., node shut down), avoid using dead context
             print(f"[ERROR] send_arm_trajectory({arm}) failed: {e}")
 
-    # ---------------- Services ----------------
+    # ------------------------------------------------------------
+    # Services
+    # ------------------------------------------------------------
     def ping(self):
+        """Call /inference/ping service."""
         try:
             return self.ping_client.call(Ping_Request())
         except Exception as e:
             return Ping_Response(success=False, message=str(e))
 
     def kill(self):
+        """Call /inference/kill service."""
         try:
             return self.kill_client.call(Kill_Request())
         except Exception as e:
