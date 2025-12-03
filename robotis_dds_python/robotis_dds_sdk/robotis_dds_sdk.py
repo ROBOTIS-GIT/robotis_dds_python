@@ -51,9 +51,9 @@ class RobotisDDSSDK:
         self._subscribed = {}
 
         # --- Mappings for cameras & arm publishers ---
-        self._camera_key_map = {}   # key → topic
-        self._arm_pubs = {}         # arm → publisher
-        self._arm_traj_epoch_ns = {}  # arm → time_from_start epoch
+        self._camera_key_map = {}      # key → topic
+        self._arm_pubs = {}            # arm → publisher
+        self._arm_traj_epoch_ns = {}   # arm → time_from_start epoch
         self._arm_last_tfs_ns = {}     # arm → last TFS ns
 
         # --- Default topics ---
@@ -89,14 +89,13 @@ class RobotisDDSSDK:
         self.spin_thread = threading.Thread(target=self.node.dds_spin, daemon=True)
         self.spin_thread.start()
 
-    # ------------------------------------------------------------
+    # ============================================================
     # Config loader: Reads config.json and registers cameras/arms
-    # ------------------------------------------------------------
+    # ============================================================
     def _load_config_and_register(self, cfg_path="config.json"):
         """
         Load config.json (auto camera & publisher registration).
-        WARNING:
-            * Modify config.json instead of touching SDK code.
+        WARNING: Modify config.json instead of touching SDK code.
         """
         try:
             with open(cfg_path, "r") as f:
@@ -120,9 +119,37 @@ class RobotisDDSSDK:
         for arm, topic in rob_cfg.get("arm_publishers", {}).items():
             self.register_arm_publisher(arm, topic)
 
-    # ------------------------------------------------------------
+    def register_camera(self, key, topic, type_name="CompressedImage_"):
+        """
+        Register a camera from config.json.
+        DO NOT modify code; edit config.json under camera_topics.
+        """
+        self._camera_key_map[key] = topic
+        msg_type = CompressedImage_ if type_name == "CompressedImage_" else Image_
+
+        def cb(msg, k=key, t=topic, ty=type_name):
+            self._camera_callback(k, ty, t, msg)
+
+        self.node.dds_create_subscription(topic, msg_type, cb)
+
+    def register_arm_publisher(self, arm: str, topic: str):
+        """Create publisher for arm trajectory (configured via config.json)."""
+        pub = self.node.dds_create_publisher(topic, JointTrajectory_)
+        self._arm_pubs[arm] = pub
+
+        # Initialize time_from_start tracking
+        now_ns = time.monotonic_ns()
+        self._arm_traj_epoch_ns[arm] = now_ns
+        self._arm_last_tfs_ns[arm] = 0
+
+    def reset_arm_tfs(self, arm: str):
+        """Reset time_from_start counter (required after controller restart)."""
+        self._arm_traj_epoch_ns[arm] = time.monotonic_ns()
+        self._arm_last_tfs_ns[arm] = 0
+
+    # ============================================================
     # Subscription helpers
-    # ------------------------------------------------------------
+    # ============================================================
     def _ensure_subscription(self, topic):
         """Create subscription on first access."""
         if topic in self._subscribed or topic not in self.topic_map:
@@ -131,9 +158,40 @@ class RobotisDDSSDK:
         self.node.dds_create_subscription(topic, msg_type, cb)
         self._subscribed[topic] = True
 
-    # ------------------------------------------------------------
+    # ============================================================
+    # Message construction helpers
+    # ============================================================
+    def _make_timestamp(self):
+        """Generate ROS2-style timestamp from system wall clock."""
+        now = time.time()
+        sec = int(now)
+        nsec = int((now - sec) * 1e9)
+        return Time_(sec=sec, nanosec=nsec)
+
+    def _make_header(self, frame_id=""):
+        """Generate standard message header with current timestamp."""
+        return Header_(stamp=self._make_timestamp(), frame_id=frame_id)
+
+    def _make_duration(self, seconds: float):
+        """Convert float seconds to Duration_ message."""
+        total_ns = int(seconds * 1e9)
+        return Duration_(sec=total_ns // 1_000_000_000, nanosec=total_ns % 1_000_000_000)
+
+    def _normalize_positions(self, positions):
+        """Convert positions to list of lists (single point → [[p1, p2, ...]])."""
+        is_multi = isinstance(positions[0], (list, tuple))
+        return positions if is_multi else [positions]
+
+    def _normalize_velocities(self, velocities, pos_list):
+        """Convert velocities to list of lists and validate length."""
+        if velocities is None:
+            return None
+        vel_list = velocities if isinstance(velocities[0], (list, tuple)) else [velocities]
+        return vel_list if len(vel_list) == len(pos_list) else None
+
+    # ============================================================
     # Image decoding utilities
-    # ------------------------------------------------------------
+    # ============================================================
     def _decode_compressed(self, msg):
         """Decode sensor_msgs/CompressedImage into OpenCV BGR frame."""
         try:
@@ -143,13 +201,30 @@ class RobotisDDSSDK:
         except:
             return None
 
-    # DDS callback for /camera/image/compressed
+    # ============================================================
+    # DDS callbacks
+    # ============================================================
     def _compressed_image_callback(self, msg):
+        """Callback for /camera/image/compressed"""
         frame = self._decode_compressed(msg)
         if frame is not None:
             self.cache["/camera/image/compressed"] = frame
 
-    # Generic callback for custom cameras registered via config.json
+    def _image_callback(self, msg):
+        """Callback for raw /camera/image"""
+        try:
+            raw = bytes(msg.data) if isinstance(msg.data, list) else msg.data
+            arr = np.frombuffer(raw, dtype=np.uint8)
+            if msg.encoding == "mono8":
+                frame = arr.reshape((msg.height, msg.width))
+            else:
+                frame = arr.reshape((msg.height, msg.width, 3))
+                if msg.encoding == "rgb8":
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            self.cache["/camera/image"] = frame
+        except:
+            pass
+
     def _camera_callback(self, key, type_name, topic, msg):
         """Unified callback handler for all cameras registered from config.json."""
         try:
@@ -169,25 +244,6 @@ class RobotisDDSSDK:
         except:
             pass
 
-    # DDS callback for raw /camera/image
-    def _image_callback(self, msg):
-        """Decode Image_ messages."""
-        try:
-            raw = bytes(msg.data) if isinstance(msg.data, list) else msg.data
-            arr = np.frombuffer(raw, dtype=np.uint8)
-            if msg.encoding == "mono8":
-                frame = arr.reshape((msg.height, msg.width))
-            else:
-                frame = arr.reshape((msg.height, msg.width, 3))
-                if msg.encoding == "rgb8":
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            self.cache["/camera/image"] = frame
-        except:
-            pass
-
-    # ------------------------------------------------------------
-    # Sensor callbacks
-    # ------------------------------------------------------------
     def _odom_callback(self, msg: Odometry_):
         """Cache odometry values."""
         self.cache[self._odom_topic] = {
@@ -217,27 +273,32 @@ class RobotisDDSSDK:
             "percentage": msg.percentage,
         }
 
-    # ------------------------------------------------------------
+    # ============================================================
     # Public getters (auto lazy-subscribe)
-    # ------------------------------------------------------------
+    # ============================================================
     def get(self, topic):
         """Retrieve cached data (ensures subscription)."""
         self._ensure_subscription(topic)
         return self.cache.get(topic)
 
     def get_image(self):
+        """Get raw camera image."""
         return self.get("/camera/image")
 
     def get_rgb_image(self):
+        """Get compressed camera image."""
         return self.get("/camera/image/compressed")
 
     def get_odometry(self):
+        """Get robot odometry."""
         return self.get(self._odom_topic)
 
     def get_joint_state(self):
+        """Get joint states."""
         return self.get(self._joint_states_topic)
 
     def get_battery_state(self):
+        """Get battery state."""
         return self.get(self._battery_topic)
 
     def get_camera(self, key: str):
@@ -254,9 +315,9 @@ class RobotisDDSSDK:
                 out[key] = frame
         return out
 
-    # ------------------------------------------------------------
+    # ============================================================
     # Publishers
-    # ------------------------------------------------------------
+    # ============================================================
     def send_cmd_vel(self, linear_x, angular_z):
         """Publish Twist command on /cmd_vel."""
         msg = Twist_(
@@ -265,24 +326,16 @@ class RobotisDDSSDK:
         )
         self.cmd_vel_pub.publish(msg)
 
-    def _make_timestamp(self):
-        """Generate ROS2-style timestamp from system wall clock."""
-        now = time.time()
-        sec = int(now)
-        nsec = int((now - sec) * 1e9)
-        return Time_(sec=sec, nanosec=nsec)
-
     def send_joint_trajectory(self, positions):
         """Publish a single joint trajectory command."""
-        stamp = self._make_timestamp()
-        header = Header_(stamp=stamp, frame_id="")
+        header = self._make_header()
 
         point = JointTrajectoryPoint_(
             positions=positions,
             velocities=[],
             accelerations=[],
             effort=[],
-            time_from_start=Time_(sec=0, nanosec=0),
+            time_from_start=self._make_duration(0.0),
         )
 
         msg = JointTrajectory_(
@@ -293,40 +346,6 @@ class RobotisDDSSDK:
 
         self.joint_traj_pub.publish(msg)
 
-    # ------------------------------------------------------------
-    # Camera / Arm registration (config.json-driven)
-    # ------------------------------------------------------------
-    def register_camera(self, key, topic, type_name="CompressedImage_"):
-        """
-        Register a camera from config.json.
-        DO NOT modify code; edit config.json under camera_topics.
-        """
-        self._camera_key_map[key] = topic
-        msg_type = CompressedImage_ if type_name == "CompressedImage_" else Image_
-
-        def cb(msg, k=key, t=topic, ty=type_name):
-            self._camera_callback(k, ty, t, msg)
-
-        self.node.dds_create_subscription(topic, msg_type, cb)
-
-    def register_arm_publisher(self, arm: str, topic: str):
-        """Create publisher for arm trajectory (configured via config.json)."""
-        pub = self.node.dds_create_publisher(topic, JointTrajectory_)
-        self._arm_pubs[arm] = pub
-
-        # Initialize time_from_start tracking
-        now_ns = time.monotonic_ns()
-        self._arm_traj_epoch_ns[arm] = now_ns
-        self._arm_last_tfs_ns[arm] = 0
-
-    def reset_arm_tfs(self, arm: str):
-        """Reset time_from_start counter (required after controller restart)."""
-        self._arm_traj_epoch_ns[arm] = time.monotonic_ns()
-        self._arm_last_tfs_ns[arm] = 0
-
-    # ------------------------------------------------------------
-    # Trajectory publishing with strict time_from_start increments
-    # ------------------------------------------------------------
     def send_arm_trajectory(self, arm: str, positions, dt: float = 0.03, velocities=None, fast_mode: bool = True):
         """
         Publish JointTrajectory ensuring:
@@ -336,21 +355,12 @@ class RobotisDDSSDK:
         if arm not in self._arm_pubs:
             return
 
-        # --- Header stamp ---
-        t_wall = time.time()
-        sec = int(t_wall)
-        nsec = int((t_wall - sec) * 1e9)
-        header = Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id="")
+        # --- Generate header ---
+        header = self._make_header()
 
         # --- Normalize input ---
-        is_multi = isinstance(positions[0], (list, tuple))
-        pos_list = positions if is_multi else [positions]
-
-        vel_list = None
-        if velocities is not None:
-            vel_list = velocities if isinstance(velocities[0], (list, tuple)) else [velocities]
-            if len(vel_list) != len(pos_list):
-                vel_list = None
+        pos_list = self._normalize_positions(positions)
+        vel_list = self._normalize_velocities(velocities, pos_list)
 
         # --- Controller timing ---
         dt = max(0.01, float(dt))
@@ -372,8 +382,7 @@ class RobotisDDSSDK:
                     velocities=list(vels),
                     accelerations=[],
                     effort=[],
-                    time_from_start=Duration_(sec=tfs_ns // 1_000_000_000,
-                                              nanosec=tfs_ns % 1_000_000_000),
+                    time_from_start=self._make_duration(tfs_ns / 1e9),
                 )
             )
 
@@ -405,9 +414,9 @@ class RobotisDDSSDK:
         except Exception as e:
             print(f"[ERROR] send_arm_trajectory({arm}) failed: {e}")
 
-    # ------------------------------------------------------------
+    # ============================================================
     # Services
-    # ------------------------------------------------------------
+    # ============================================================
     def ping(self):
         """Call /inference/ping service."""
         try:
