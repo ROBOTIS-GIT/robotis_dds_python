@@ -362,14 +362,21 @@ class RobotisDDSSDK:
         pos_list = self._normalize_positions(positions)
         vel_list = self._normalize_velocities(velocities, pos_list)
 
+        MAX_TFS_NS = int(1.0 * 1e9)
+
         # --- Controller timing ---
         dt = max(0.01, float(dt))
-        base_delay = max(dt, 0.06) if fast_mode else max(dt, 0.12)
+        base_delay = max(dt, 0.05) if fast_mode else max(dt, 0.12)
 
+        # --- Load previous tfs ---
         last_tfs_ns = self._arm_last_tfs_ns.get(arm, 0)
 
-        # Ensure strictly increasing monotonic tfs
-        batch_gap_ns = int((0.02 if fast_mode else 0.05) * 1e9)
+        # --- Reset if too large ---
+        if last_tfs_ns > MAX_TFS_NS:
+            last_tfs_ns = 0
+
+        # --- Next batch start: strictly increasing ---
+        batch_gap_ns = int((0.015 if fast_mode else 0.05) * 1e9)
         start_ns = max(last_tfs_ns + batch_gap_ns, int(base_delay * 1e9))
 
         points = []
@@ -379,12 +386,19 @@ class RobotisDDSSDK:
             points.append(
                 JointTrajectoryPoint_(
                     positions=list(pos),
-                    velocities=list(vels),
+                    velocities=vels,
                     accelerations=[],
                     effort=[],
-                    time_from_start=self._make_duration(tfs_ns / 1e9),
+                    time_from_start=Duration_(
+                        sec=tfs_ns // 1_000_000_000,
+                        nanosec=tfs_ns % 1_000_000_000,
+                    )
                 )
             )
+
+        # Save for next batch
+        self._arm_last_tfs_ns[arm] = points[-1].time_from_start.sec * 1e9 + points[-1].time_from_start.nanosec
+
 
         # --- Final publish ---
         try:
