@@ -168,26 +168,17 @@ class RobotisDDSSDK:
         nsec = int((now - sec) * 1e9)
         return Time_(sec=sec, nanosec=nsec)
 
-    def _make_header(self, frame_id=""):
-        """Generate standard message header with current timestamp."""
-        return Header_(stamp=self._make_timestamp(), frame_id=frame_id)
-
-    def _make_duration(self, seconds: float):
-        """Convert float seconds to Duration_ message."""
-        total_ns = int(seconds * 1e9)
-        return Duration_(sec=total_ns // 1_000_000_000, nanosec=total_ns % 1_000_000_000)
-
-    def _normalize_positions(self, positions):
-        """Convert positions to list of lists (single point → [[p1, p2, ...]])."""
-        is_multi = isinstance(positions[0], (list, tuple))
-        return positions if is_multi else [positions]
-
-    def _normalize_velocities(self, velocities, pos_list):
-        """Convert velocities to list of lists and validate length."""
-        if velocities is None:
-            return None
-        vel_list = velocities if isinstance(velocities[0], (list, tuple)) else [velocities]
-        return vel_list if len(vel_list) == len(pos_list) else None
+    def _make_header(self, frame_id="", future_offset=0.05):
+        """
+        Generate standard message header with timestamp.
+        Args:
+            frame_id: Frame ID for the header
+            future_offset: Seconds to add to current time (default 50ms)
+        """
+        future_time = time.time() + future_offset
+        sec = int(future_time)
+        nsec = int((future_time - sec) * 1e9)
+        return Header_(stamp=Time_(sec=sec, nanosec=nsec), frame_id=frame_id)
 
     # ============================================================
     # Image decoding utilities
@@ -346,84 +337,49 @@ class RobotisDDSSDK:
 
         self.joint_traj_pub.publish(msg)
 
-    def send_arm_trajectory(self, arm: str, positions, dt: float = 0.03, velocities=None, fast_mode: bool = True):
+    def send_arm_trajectory(self, arm: str, positions):
         """
-        Publish JointTrajectory ensuring:
-        * time_from_start strictly increases (required by ros2_control)
-        * Optional velocities per point
+        Publish arm trajectory for specified arm.
+        Args:
+            arm: "left" or "right"
+            positions: list of joint positions (length 8)
+        Note:
+            Header timestamp and time_from_start must be in the future for controller acceptance.
         """
         if arm not in self._arm_pubs:
             return
 
-        # --- Generate header ---
-        header = self._make_header()
-
-        # --- Normalize input ---
-        pos_list = self._normalize_positions(positions)
-        vel_list = self._normalize_velocities(velocities, pos_list)
-
-        MAX_TFS_NS = int(1.0 * 1e9)
-
-        # --- Controller timing ---
-        dt = max(0.01, float(dt))
-        base_delay = max(dt, 0.05) if fast_mode else max(dt, 0.12)
-
-        # --- Load previous tfs ---
-        last_tfs_ns = self._arm_last_tfs_ns.get(arm, 0)
-
-        # --- Reset if too large ---
-        if last_tfs_ns > MAX_TFS_NS:
-            last_tfs_ns = 0
-
-        # --- Next batch start: strictly increasing ---
-        batch_gap_ns = int((0.015 if fast_mode else 0.05) * 1e9)
-        start_ns = max(last_tfs_ns + batch_gap_ns, int(base_delay * 1e9))
-
-        points = []
-        for i, pos in enumerate(pos_list):
-            tfs_ns = start_ns + int(i * dt * 1e9)
-            vels = vel_list[i] if vel_list else []
-            points.append(
-                JointTrajectoryPoint_(
-                    positions=list(pos),
-                    velocities=vels,
-                    accelerations=[],
-                    effort=[],
-                    time_from_start=Duration_(
-                        sec=tfs_ns // 1_000_000_000,
-                        nanosec=tfs_ns % 1_000_000_000,
-                    )
-                )
-            )
-
-        # Save for next batch
-        self._arm_last_tfs_ns[arm] = points[-1].time_from_start.sec * 1e9 + points[-1].time_from_start.nanosec
-
-
-        # --- Final publish ---
         try:
+            # Joint names for left/right arms
             JOINT_NAME_MAP = {
                 "left": [
-                    'arm_l_joint1','arm_l_joint2','arm_l_joint3','arm_l_joint4',
-                    'arm_l_joint5','arm_l_joint6','arm_l_joint7','gripper_l_joint1'
+                    'arm_l_joint1', 'arm_l_joint2', 'arm_l_joint3', 'arm_l_joint4',
+                    'arm_l_joint5', 'arm_l_joint6', 'arm_l_joint7', 'gripper_l_joint1'
                 ],
                 "right": [
-                    'arm_r_joint1','arm_r_joint2','arm_r_joint3','arm_r_joint4',
-                    'arm_r_joint5','arm_r_joint6','arm_r_joint7','gripper_r_joint1'
+                    'arm_r_joint1', 'arm_r_joint2', 'arm_r_joint3', 'arm_r_joint4',
+                    'arm_r_joint5', 'arm_r_joint6', 'arm_r_joint7', 'gripper_r_joint1'
                 ]
             }
 
-            msg = JointTrajectory_(
-                header=header,
-                joint_names=JOINT_NAME_MAP.get(arm, []),
-                points=points,
+            # Create single trajectory point with future execution time
+            point = JointTrajectoryPoint_(
+                positions=list(positions),
+                velocities=[],
+                accelerations=[],
+                effort=[],
+                time_from_start=Duration_(sec=0, nanosec=int(0.1 * 1e9)),  # 100ms execution time
             )
 
-            self._arm_pubs[arm].publish(msg)
+            # Build trajectory message with future timestamp
+            msg = JointTrajectory_(
+                header=self._make_header(future_offset=0.1),  # 100ms ahead
+                joint_names=JOINT_NAME_MAP.get(arm, []),
+                points=[point],
+            )
 
-            # Update last tfs
-            last_point = points[-1].time_from_start
-            self._arm_last_tfs_ns[arm] = last_point.sec * 1_000_000_000 + last_point.nanosec
+            # Publish
+            self._arm_pubs[arm].publish(msg)
 
         except Exception as e:
             print(f"[ERROR] send_arm_trajectory({arm}) failed: {e}")
