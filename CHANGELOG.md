@@ -1,5 +1,12 @@
 # Changelog
 
+0.1.2 (2026-01-15)
+------------------
+* Add String message support for std_msgs
+* Add Float64MultiArray message support for std_msgs
+* Add example publishers and subscribers for String and Float64MultiArray
+* Contributors: Heewon Lee
+
 0.1.1 (2025-10-27)
 ------------------
 * Support for geometry_msgs and tf2_msgs
