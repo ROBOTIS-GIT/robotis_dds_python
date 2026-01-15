@@ -46,12 +46,12 @@ def create_multiarray(i: int) -> Float64MultiArray_:
     dim_row = MultiArrayDimension_(
         label="rows",
         size=2,
-        stride=4
+        stride=2
     )
     dim_col = MultiArrayDimension_(
         label="cols",
         size=2,
-        stride=2
+        stride=1
     )
 
     layout = MultiArrayLayout_(

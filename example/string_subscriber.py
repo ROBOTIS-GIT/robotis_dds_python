@@ -42,5 +42,6 @@ try:
     while True:
         for sample in reader.take_iter():
             print("[Subscriber] Received:", sample.data)
+        time.sleep(0.1)
 except KeyboardInterrupt:
-    print("Stop")
+    print("\nSubscriber stopped.")
