@@ -59,7 +59,7 @@ def create_multiarray(i: int) -> Float64MultiArray_:
         data_offset=0
     )
 
-    data = [i*1.0, i+1.0, i+2.0, i+3.0] 
+    data = [i * 1.0, i + 1.0, i + 2.0, i + 3.0]
 
     msg = Float64MultiArray_(
         layout=layout,
