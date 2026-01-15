@@ -21,7 +21,6 @@ from cyclonedds.core import Qos, Policy
 from cyclonedds.util import duration
 from robotis_dds_python.tools.topic_manager import TopicManager
 
-# 우리가 만든 메시지
 from robotis_dds_python.idl.std_msgs.msg import String_
 
 qos = Qos(
