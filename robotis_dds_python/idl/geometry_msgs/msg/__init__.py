@@ -7,6 +7,7 @@
 
 from ._Vector3_ import Vector3_
 from ._Quaternion_ import Quaternion_
+from ._Twist_ import Twist_
 from ._Transform_ import Transform_
 from ._TransformStamped_ import TransformStamped_
-__all__ = ["Vector3_", "Quaternion_", "Transform_", "TransformStamped_", ]
+__all__ = ["Vector3_", "Quaternion_", "Twist_", "Transform_", "TransformStamped_", ]
