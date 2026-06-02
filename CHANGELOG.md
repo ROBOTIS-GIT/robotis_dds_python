@@ -1,5 +1,11 @@
 # Changelog
 
+0.1.4 (2026-06-02)
+------------------
+* Add _Odometry in nav_msgs
+* Add _Point, _Pose, _PoseWithCovariance, and _TwistWithCovariance in geometry_msgs
+* Contributors: Howon Kim
+
 0.1.3 (2026-05-28)
 ------------------
 * Add _Twist in geometry_msgs

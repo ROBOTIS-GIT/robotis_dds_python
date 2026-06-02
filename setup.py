@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='robotis_dds_python',
-    version='0.1.3',
+    version='0.1.4',
     author='Taehyeong Kim',
     author_email='kth@robotis.com',
     maintainer='Pyo',
