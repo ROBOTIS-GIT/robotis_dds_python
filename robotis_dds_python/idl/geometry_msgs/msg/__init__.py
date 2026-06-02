@@ -7,7 +7,21 @@
 
 from ._Vector3_ import Vector3_
 from ._Quaternion_ import Quaternion_
+from ._Point_ import Point_
+from ._Pose_ import Pose_
+from ._PoseWithCovariance_ import PoseWithCovariance_
 from ._Twist_ import Twist_
+from ._TwistWithCovariance_ import TwistWithCovariance_
 from ._Transform_ import Transform_
 from ._TransformStamped_ import TransformStamped_
-__all__ = ["Vector3_", "Quaternion_", "Twist_", "Transform_", "TransformStamped_", ]
+__all__ = [
+    "Vector3_",
+    "Quaternion_",
+    "Point_",
+    "Pose_",
+    "PoseWithCovariance_",
+    "Twist_",
+    "TwistWithCovariance_",
+    "Transform_",
+    "TransformStamped_",
+]
